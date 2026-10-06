@@ -1,0 +1,345 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Montserrat:wght@500;600;700;800;900&display=swap');
+
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  --sidebar-bg: #00163c;
+  --sidebar-active: #003e9e;
+  --navbar-bg: #0057c7;
+  --main-bg: #111520;
+  --card-bg: #1a2233;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #ffffff;
+  --text-secondary: #b8c2d1;
+  --text-muted: #8a94a6;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #38bdf8;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--main-bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+  }
+
+  p {
+    line-height: 1.6;
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  /* Premium Dark Card */
+  .card {
+    border-radius: 1rem;
+    border-width: 1px;
+    border-style: solid;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* Sidebar Links */
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    user-select: none;
+    margin-bottom: 0.25rem;
+    color: #dbe7ff;
+  }
+
+  .sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+  }
+
+  .sidebar-link.active {
+    background: var(--sidebar-active);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 62, 158, 0.3);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    font-size: 13.5px;
+    font-weight: 600;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+    cursor: pointer;
+    user-select: none;
+    border-width: 1px;
+    border-style: solid;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    color: #ffffff;
+    border-color: transparent;
+    background: var(--navbar-bg);
+    box-shadow: 0 4px 15px rgba(0, 87, 199, 0.3);
+  }
+
+  .btn-primary:hover {
+    background: #0066eb;
+    box-shadow: 0 6px 20px rgba(0, 87, 199, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .btn-outline {
+    background-color: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+  }
+
+  .btn-outline:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+  .badge-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+  .badge-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+  .badge-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+  .badge-gray { background: rgba(138, 148, 166, 0.15); color: #8a94a6; }
+
+  /* Forms */
+  .form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 0.75rem;
+    font-size: 14px;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    color-scheme: dark;
+  }
+
+  .form-input:focus {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--navbar-bg);
+    box-shadow: 0 0 0 4px rgba(0, 87, 199, 0.15);
+  }
+
+  select.form-input option {
+    background-color: #1a2233;
+    color: #ffffff;
+  }
+
+  /* Stat Card Specific */
+  .stat-card {
+    border-radius: 1rem;
+    border-width: 1px;
+    border-style: solid;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--navbar-bg);
+    opacity: 0.8;
+  }
+
+  /* Tabs */
+  .tab-btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom-width: 2px;
+    border-bottom-style: solid;
+    border-bottom-color: transparent;
+    cursor: pointer;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+
+  .tab-btn:hover {
+    color: #ffffff;
+  }
+
+  .tab-btn.active {
+    color: #ffffff;
+    border-color: var(--navbar-bg);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .text-muted { color: var(--text-muted); }
+  .text-secondary { color: var(--text-secondary); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Mobile Overrides */
+@media (max-width: 768px) {
+  .card { padding: 1rem; }
+  .btn { padding: 0.5rem 1rem; font-size: 13px; }
+}
+
+/* Rich Text Editor & Communication HTML Output Styling */
+.custom-editor ul, .email-html-content ul, .communication-html-body ul {
+  list-style-type: disc !important;
+  padding-left: 2rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.custom-editor ol, .email-html-content ol, .communication-html-body ol {
+  list-style-type: decimal !important;
+  padding-left: 2rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.custom-editor li, .email-html-content li, .communication-html-body li {
+  display: list-item !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.custom-editor blockquote, .email-html-content blockquote, .communication-html-body blockquote {
+  border-left: 4px solid rgba(255, 255, 255, 0.2) !important;
+  padding-left: 1rem !important;
+  margin-left: 0.5rem !important;
+  margin-right: 0.5rem !important;
+  color: #94a3b8 !important;
+  font-style: italic !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+  display: block !important;
+}
