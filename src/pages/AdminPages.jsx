@@ -103,7 +103,7 @@ async function openAttachment(att, matterId, openModal, toast) {
   try {
     let documentId = att.id;
     let mimeType = 'image/png'; // default fallback
-    
+
     if (!documentId) {
       if (!matterId) throw new Error('Cannot lookup file without matter context.');
       const res = await api.documents.list({ matter_id: matterId, limit: 100 });
@@ -116,7 +116,7 @@ async function openAttachment(att, matterId, openModal, toast) {
       const res = await api.documents.get(documentId);
       mimeType = res.data?.mime_type || 'image/png';
     }
-    
+
     const { blob } = await api.documents.download(documentId);
     const url = window.URL.createObjectURL(blob);
     openModal('preview-document', { id: documentId, title: att.name, url, mime_type: mimeType });
@@ -315,8 +315,8 @@ export function AdminDashboard({ navigate, toast, openModal }) {
   return (
     <div className="animate-fade-in space-y-6 pb-12">
       {/* SECTION A: PAGE HEADER */}
-      <PageHeader 
-        title="Dashboard" 
+      <PageHeader
+        title="Dashboard"
         subtitle={`Welcome back, Administrator. System health optimized · ${dash.revenue.monthLabel}`}
       >
         <button onClick={exportReport} className="btn btn-secondary">
@@ -335,17 +335,17 @@ export function AdminDashboard({ navigate, toast, openModal }) {
 
       {/* SECTION B: KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Clients" value={String(c.totalClients)} 
-          icon={<svg className="w-6 h-6 text-[#0057c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>} 
+        <StatCard label="Total Clients" value={String(c.totalClients)}
+          icon={<svg className="w-6 h-6 text-[#0057c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
           iconBg="bg-[#0057c7]/10" gradient="#0057c7" />
-        <StatCard label="Open Matters" value={String(c.openMatters)} 
-          icon={<svg className="w-6 h-6 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>} 
+        <StatCard label="Open Matters" value={String(c.openMatters)}
+          icon={<svg className="w-6 h-6 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>}
           iconBg="bg-[#22c55e]/10" gradient="#22c55e" />
-        <StatCard label="Upcoming Deadlines" value={String(c.upcomingDeadlineCount)} 
-          icon={<svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>} 
+        <StatCard label="Upcoming Deadlines" value={String(c.upcomingDeadlineCount)}
+          icon={<svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
           iconBg="bg-[#f59e0b]/10" gradient="#f59e0b" />
-        <StatCard label={`Revenue (${dash.revenue.monthLabel.split(' ')[0]})`} value={dash.revenue.totalFormatted} 
-          icon={<svg className="w-6 h-6 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10h1m11 0h1m-6 0h1m-10 11v-11m16 11v-11m-6 11v-11m-5 11v-11" /></svg>} 
+        <StatCard label={`Revenue (${dash.revenue.monthLabel.split(' ')[0]})`} value={dash.revenue.totalFormatted}
+          icon={<svg className="w-6 h-6 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10h1m11 0h1m-6 0h1m-10 11v-11m16 11v-11m-6 11v-11m-5 11v-11" /></svg>}
           iconBg="bg-[#38bdf8]/10" gradient="#38bdf8" />
       </div>
 
@@ -492,10 +492,10 @@ export function AdminDashboard({ navigate, toast, openModal }) {
       <Card>
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-xl bg-[#f59e0b]/10 flex items-center justify-center text-white">
-                <svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-             </div>
-             <h3 className="text-lg font-800 text-white tracking-tight">Recent Activity Feed</h3>
+            <div className="w-10 h-10 rounded-xl bg-[#f59e0b]/10 flex items-center justify-center text-white">
+              <svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </div>
+            <h3 className="text-lg font-800 text-white tracking-tight">Recent Activity Feed</h3>
           </div>
           <button className="text-[12px] text-[#8a94a6] font-800 uppercase tracking-widest hover:text-white transition-colors">Audit Log</button>
         </div>
@@ -527,7 +527,7 @@ export function ClientsPage({ navigate, toast, openModal }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [clients, setClients] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [error, setError] = useState('');
@@ -661,9 +661,9 @@ export function ClientsPage({ navigate, toast, openModal }) {
       <Table headers={['Client Identity', 'Client Role', 'Opposing Party / Counsel', 'Contact Channel', 'Classification', 'Active Matters', 'Access Status', 'Date Enrolled', '']}
         searchPlaceholder="Search clients by name or email..." onSearch={setSearch}
         actions={
-          <Select 
-            value={statusFilter} 
-            onChange={e => setStatusFilter(e.target.value)} 
+          <Select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
             className="h-9 min-w-[140px] !py-0 !px-3 text-[12px] rounded-xl"
           >
             <option value="All Status">All Status</option>
@@ -731,24 +731,24 @@ export function ClientsPage({ navigate, toast, openModal }) {
             <Td className="text-[#8a94a6] font-800 text-[11px] uppercase tracking-wider">{c.joined}</Td>
             <Td>
               <div className="flex gap-2 justify-end pr-2">
-                <button onClick={e => { e.stopPropagation(); navigate(`/admin/clients/${c.id}`); }} 
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#0057c7] hover:text-white transition-all group/btn shadow-lg" 
+                <button onClick={e => { e.stopPropagation(); navigate(`/admin/clients/${c.id}`); }}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#0057c7] hover:text-white transition-all group/btn shadow-lg"
                   title="View Client">
                   <svg className="w-4 h-4 transition-transform group-hover/btn:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 </button>
-                <button onClick={e => { e.stopPropagation(); openModal('edit-client', c.raw); }} 
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#f59e0b] hover:text-white transition-all group/btn shadow-lg" 
+                <button onClick={e => { e.stopPropagation(); openModal('edit-client', c.raw); }}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#f59e0b] hover:text-white transition-all group/btn shadow-lg"
                   title="Edit Client">
                   <svg className="w-4 h-4 transition-transform group-hover/btn:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 00 2 2h14a2 2 0 00 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                 </button>
-                <button onClick={e => { e.stopPropagation(); setMergePrimaryClient(c); setMergeDuplicateId(''); }} 
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#0057c7] hover:text-white transition-all group/btn shadow-lg" 
+                <button onClick={e => { e.stopPropagation(); setMergePrimaryClient(c); setMergeDuplicateId(''); }}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#0057c7] hover:text-white transition-all group/btn shadow-lg"
                   title="Merge Duplicate Contact">
                   <span className="text-xs">🔀</span>
                 </button>
                 {canDeleteRecord() && (
-                  <button onClick={e => { e.stopPropagation(); setDeleteTargetClient(c); setTypedConfirm(''); }} 
-                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-red-600 hover:text-white transition-all group/btn shadow-lg" 
+                  <button onClick={e => { e.stopPropagation(); setDeleteTargetClient(c); setTypedConfirm(''); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-red-600 hover:text-white transition-all group/btn shadow-lg"
                     title="Hard Delete Client">
                     <span className="text-xs">🗑️</span>
                   </button>
@@ -870,7 +870,7 @@ export function ClientDetailPage({ clientId, navigate, toast, openModal, role = 
   const [client, setClient] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [documents, setDocuments] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [error, setError] = useState('');
@@ -1019,7 +1019,7 @@ export function ClientDetailPage({ clientId, navigate, toast, openModal, role = 
       <Card className="relative overflow-hidden">
         {/* Background Accent */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary-600/5 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="flex items-start gap-5 flex-wrap relative z-10">
           <Avatar initials={view.avatar} size="xl" color="#0057c7" />
           <div className="flex-1 min-w-[200px]">
@@ -1083,20 +1083,20 @@ export function ClientDetailPage({ clientId, navigate, toast, openModal, role = 
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-white/5">
           {[
-            { 
-              label: 'Active Matters', 
-              value: activeMatters, 
-              icon: <svg className="w-6 h-6 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg> 
+            {
+              label: 'Active Matters',
+              value: activeMatters,
+              icon: <svg className="w-6 h-6 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
             },
-            { 
-              label: 'Documents Vault', 
-              value: documents.length, 
-              icon: <svg className="w-6 h-6 text-[#10b981]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> 
+            {
+              label: 'Documents Vault',
+              value: documents.length,
+              icon: <svg className="w-6 h-6 text-[#10b981]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             },
-            { 
-              label: 'Pending Items', 
-              value: pendingInv, 
-              icon: <svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            {
+              label: 'Pending Items',
+              value: pendingInv,
+              icon: <svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             },
           ].map((s) => (
             <div key={s.label} className="flex flex-col items-center p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all group">
@@ -1162,10 +1162,10 @@ export function ClientDetailPage({ clientId, navigate, toast, openModal, role = 
               Internal Case Notes
             </h3>
             <div className="flex-1 min-h-[180px]">
-              <Textarea 
-                className="h-full min-h-[180px] text-[14px] leading-relaxed" 
-                value={notes} 
-                onChange={(e) => setNotes(e.target.value)} 
+              <Textarea
+                className="h-full min-h-[180px] text-[14px] leading-relaxed"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 placeholder="Enter confidential client notes here..."
               />
             </div>
@@ -1329,7 +1329,7 @@ export function CasesPage({ navigate, toast, openModal }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [matters, setMatters] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [error, setError] = useState('');
@@ -1421,9 +1421,9 @@ export function CasesPage({ navigate, toast, openModal }) {
       <Table headers={['Matter ID', 'Parties', 'Title', 'Lawyer', 'Type', 'Status', 'Next Hearing', 'Priority', '']}
         searchPlaceholder="Search matters..." onSearch={setSearch}
         actions={
-          <Select 
-            value={statusFilter} 
-            onChange={e => setStatusFilter(e.target.value)} 
+          <Select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
             className="h-9 min-w-[140px] !py-0 !px-3 text-[12px] rounded-xl"
           >
             <option value="All Status">All Status</option>
@@ -1456,9 +1456,9 @@ export function CasesPage({ navigate, toast, openModal }) {
             <Td className="whitespace-nowrap"><Badge status={c.priority} /></Td>
             <Td className="whitespace-nowrap">
               <div className="flex justify-end pr-1">
-                <button 
-                  onClick={e => { e.stopPropagation(); navigate(`/admin/matters/${c.id}`); }} 
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#0057c7] hover:text-white transition-all group/btn" 
+                <button
+                  onClick={e => { e.stopPropagation(); navigate(`/admin/matters/${c.id}`); }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 border border-white/5 text-[#8a94a6] hover:bg-[#0057c7] hover:text-white transition-all group/btn"
                   title="View Matter">
                   <svg className="w-4 h-4 transition-transform group-hover/btn:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 </button>
@@ -1634,11 +1634,10 @@ function MatterTimelineTab({ caseId, apiMatter, toast }) {
                 key={mod}
                 type="button"
                 onClick={() => setSelectedModule(mod)}
-                className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all border ${
-                  selectedModule === mod
+                className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all border ${selectedModule === mod
                     ? 'bg-[#0057c7] text-white border-[#38bdf8]/50 shadow-md shadow-[#0057c7]/30'
                     : 'bg-white/5 text-slate-400 hover:text-white border-white/5 hover:border-white/20'
-                }`}
+                  }`}
               >
                 {mod}
               </button>
@@ -2052,11 +2051,10 @@ export function ContactsPage({ navigate, toast, openModal }) {
             <button
               key={t}
               onClick={() => { setPartyTypeFilter(t); setPage(1); }}
-              className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all border ${
-                partyTypeFilter === t
+              className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all border ${partyTypeFilter === t
                   ? 'bg-[#0057c7] text-white border-[#38bdf8]/50 shadow-md'
                   : 'bg-white/5 text-slate-400 hover:text-white border-white/5'
-              }`}
+                }`}
             >
               {t}
             </button>
@@ -2082,11 +2080,10 @@ export function ContactsPage({ navigate, toast, openModal }) {
           <button
             key={tab.id}
             onClick={() => { setDirectoryTab(tab.id); setPage(1); }}
-            className={`text-[11px] font-bold px-3.5 py-1.5 rounded-xl transition-all border flex items-center gap-1.5 ${
-              directoryTab === tab.id
+            className={`text-[11px] font-bold px-3.5 py-1.5 rounded-xl transition-all border flex items-center gap-1.5 ${directoryTab === tab.id
                 ? `bg-${tab.color}-500/20 text-${tab.color}-300 border-${tab.color}-500/40 shadow-md shadow-${tab.color}-500/10`
                 : 'bg-white/[0.03] text-slate-400 hover:text-white border-white/5 hover:border-white/10'
-            }`}
+              }`}
             style={directoryTab === tab.id ? {
               background: tab.color === 'sky' ? 'rgba(56,189,248,0.15)' : tab.color === 'amber' ? 'rgba(245,158,11,0.15)' : tab.color === 'purple' ? 'rgba(168,85,247,0.15)' : tab.color === 'emerald' ? 'rgba(16,185,129,0.15)' : tab.color === 'rose' ? 'rgba(244,63,94,0.15)' : tab.color === 'indigo' ? 'rgba(99,102,241,0.15)' : tab.color === 'blue' ? 'rgba(59,130,246,0.15)' : tab.color === 'cyan' ? 'rgba(6,182,212,0.15)' : 'rgba(20,184,166,0.15)',
               borderColor: tab.color === 'sky' ? 'rgba(56,189,248,0.4)' : tab.color === 'amber' ? 'rgba(245,158,11,0.4)' : tab.color === 'purple' ? 'rgba(168,85,247,0.4)' : tab.color === 'emerald' ? 'rgba(16,185,129,0.4)' : tab.color === 'rose' ? 'rgba(244,63,94,0.4)' : tab.color === 'indigo' ? 'rgba(99,102,241,0.4)' : tab.color === 'blue' ? 'rgba(59,130,246,0.4)' : tab.color === 'cyan' ? 'rgba(6,182,212,0.4)' : 'rgba(20,184,166,0.4)',
@@ -2112,97 +2109,97 @@ export function ContactsPage({ navigate, toast, openModal }) {
             <Table headers={['Contact Name', 'Type & Org', 'Directory Category', 'Email & Phone', 'Linked Matters', 'Actions']}>
               {contacts.filter(c => directoryTab === 'All' || (c.category_type || 'General') === directoryTab).map(c => (
                 <Tr key={c.id} className="hover:bg-white/[0.04] transition-colors border-b border-white/5">
-                    <Td className="font-bold text-white text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-[#0057c7]/20 border border-[#0057c7]/40 flex items-center justify-center text-xs font-extrabold text-[#38bdf8]">
-                          {leadInitials(c.full_name)}
-                        </div>
+                  <Td className="font-bold text-white text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#0057c7]/20 border border-[#0057c7]/40 flex items-center justify-center text-xs font-extrabold text-[#38bdf8]">
+                        {leadInitials(c.full_name)}
+                      </div>
+                      <div>
+                        <div>{c.full_name}</div>
+                        {c.address_line_1 && <div className="text-[10px] text-slate-400 font-normal">{c.address_line_1}</div>}
+                      </div>
+                    </div>
+                  </Td>
+                  <Td>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.party_type === 'Organization' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-sky-500/20 text-sky-300 border-sky-500/40'}`}>
+                      {c.party_type || 'Person'}
+                    </span>
+                    {c.organization_name && <div className="text-[11px] text-slate-300 mt-1">{c.organization_name}</div>}
+                  </Td>
+                  <Td>
+                    {(() => {
+                      const cat = c.category_type || 'General';
+                      const catColors = { 'Court': 'amber', 'Clerk': 'purple', 'Vendor': 'emerald', 'Process Server': 'rose', 'Expert': 'indigo', 'Mediator': 'teal', 'Insurance Provider': 'blue', 'Counsel': 'cyan', 'General': 'slate', 'Defendant': 'rose', 'Plaintiff': 'amber' };
+                      const cl = catColors[cat] || 'slate';
+                      return (
                         <div>
-                          <div>{c.full_name}</div>
-                          {c.address_line_1 && <div className="text-[10px] text-slate-400 font-normal">{c.address_line_1}</div>}
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border" style={{
+                            background: cl === 'amber' ? 'rgba(245,158,11,0.15)' : cl === 'purple' ? 'rgba(168,85,247,0.15)' : cl === 'emerald' ? 'rgba(16,185,129,0.15)' : cl === 'rose' ? 'rgba(244,63,94,0.15)' : cl === 'indigo' ? 'rgba(99,102,241,0.15)' : cl === 'teal' ? 'rgba(20,184,166,0.15)' : cl === 'blue' ? 'rgba(59,130,246,0.15)' : cl === 'cyan' ? 'rgba(6,182,212,0.15)' : 'rgba(148,163,184,0.15)',
+                            borderColor: cl === 'amber' ? 'rgba(245,158,11,0.4)' : cl === 'purple' ? 'rgba(168,85,247,0.4)' : cl === 'emerald' ? 'rgba(16,185,129,0.4)' : cl === 'rose' ? 'rgba(244,63,94,0.4)' : cl === 'indigo' ? 'rgba(99,102,241,0.4)' : cl === 'teal' ? 'rgba(20,184,166,0.4)' : cl === 'blue' ? 'rgba(59,130,246,0.4)' : cl === 'cyan' ? 'rgba(6,182,212,0.4)' : 'rgba(148,163,184,0.3)',
+                            color: cl === 'amber' ? '#fbbf24' : cl === 'purple' ? '#c084fc' : cl === 'emerald' ? '#34d399' : cl === 'rose' ? '#fb7185' : cl === 'indigo' ? '#818cf8' : cl === 'teal' ? '#2dd4bf' : cl === 'blue' ? '#60a5fa' : cl === 'cyan' ? '#22d3ee' : '#94a3b8'
+                          }}>
+                            {cat === 'Court' ? '🏛️' : cat === 'Clerk' ? '📝' : cat === 'Vendor' ? '🏢' : cat === 'Process Server' ? '📨' : cat === 'Expert' ? '🧑‍⚕️' : cat === 'Mediator' ? '⚖️' : cat === 'Insurance Provider' ? '🛡️' : cat === 'Counsel' ? '🎓' : cat === 'Defendant' ? '👤' : cat === 'Plaintiff' ? '⚖️' : '👤'} {cat === 'Defendant' ? 'Defendant / Respondent' : cat === 'Plaintiff' ? 'Plaintiff / Complainant' : cat}
+                          </span>
+                          {c.department && <div className="text-[10px] text-slate-400 mt-1">{c.department}</div>}
+                          {c.vendor_service && <div className="text-[10px] text-slate-500 italic">{c.vendor_service}</div>}
                         </div>
-                      </div>
-                    </Td>
-                    <Td>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.party_type === 'Organization' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-sky-500/20 text-sky-300 border-sky-500/40'}`}>
-                        {c.party_type || 'Person'}
+                      );
+                    })()}
+                  </Td>
+                  <Td className="text-xs text-slate-300">
+                    <div>📧 {c.email || '—'}</div>
+                    <div className="text-slate-400 text-[11px]">📞 {c.phone || '—'}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px]">
+                      <span className="text-slate-400 font-mono">
+                        🪪 {c.revealed_id ? c.revealed_id : (c.government_id ? '••••-••••-' + String(c.government_id).slice(-4) : 'SSN/DL: —')}
                       </span>
-                      {c.organization_name && <div className="text-[11px] text-slate-300 mt-1">{c.organization_name}</div>}
-                    </Td>
-                    <Td>
-                      {(() => {
-                        const cat = c.category_type || 'General';
-                        const catColors = { 'Court': 'amber', 'Clerk': 'purple', 'Vendor': 'emerald', 'Process Server': 'rose', 'Expert': 'indigo', 'Mediator': 'teal', 'Insurance Provider': 'blue', 'Counsel': 'cyan', 'General': 'slate', 'Defendant': 'rose', 'Plaintiff': 'amber' };
-                        const cl = catColors[cat] || 'slate';
-                        return (
-                          <div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border" style={{
-                              background: cl === 'amber' ? 'rgba(245,158,11,0.15)' : cl === 'purple' ? 'rgba(168,85,247,0.15)' : cl === 'emerald' ? 'rgba(16,185,129,0.15)' : cl === 'rose' ? 'rgba(244,63,94,0.15)' : cl === 'indigo' ? 'rgba(99,102,241,0.15)' : cl === 'teal' ? 'rgba(20,184,166,0.15)' : cl === 'blue' ? 'rgba(59,130,246,0.15)' : cl === 'cyan' ? 'rgba(6,182,212,0.15)' : 'rgba(148,163,184,0.15)',
-                              borderColor: cl === 'amber' ? 'rgba(245,158,11,0.4)' : cl === 'purple' ? 'rgba(168,85,247,0.4)' : cl === 'emerald' ? 'rgba(16,185,129,0.4)' : cl === 'rose' ? 'rgba(244,63,94,0.4)' : cl === 'indigo' ? 'rgba(99,102,241,0.4)' : cl === 'teal' ? 'rgba(20,184,166,0.4)' : cl === 'blue' ? 'rgba(59,130,246,0.4)' : cl === 'cyan' ? 'rgba(6,182,212,0.4)' : 'rgba(148,163,184,0.3)',
-                              color: cl === 'amber' ? '#fbbf24' : cl === 'purple' ? '#c084fc' : cl === 'emerald' ? '#34d399' : cl === 'rose' ? '#fb7185' : cl === 'indigo' ? '#818cf8' : cl === 'teal' ? '#2dd4bf' : cl === 'blue' ? '#60a5fa' : cl === 'cyan' ? '#22d3ee' : '#94a3b8'
-                            }}>
-                              {cat === 'Court' ? '🏛️' : cat === 'Clerk' ? '📝' : cat === 'Vendor' ? '🏢' : cat === 'Process Server' ? '📨' : cat === 'Expert' ? '🧑‍⚕️' : cat === 'Mediator' ? '⚖️' : cat === 'Insurance Provider' ? '🛡️' : cat === 'Counsel' ? '🎓' : cat === 'Defendant' ? '👤' : cat === 'Plaintiff' ? '⚖️' : '👤'} {cat === 'Defendant' ? 'Defendant / Respondent' : cat === 'Plaintiff' ? 'Plaintiff / Complainant' : cat}
-                            </span>
-                            {c.department && <div className="text-[10px] text-slate-400 mt-1">{c.department}</div>}
-                            {c.vendor_service && <div className="text-[10px] text-slate-500 italic">{c.vendor_service}</div>}
-                          </div>
-                        );
-                      })()}
-                    </Td>
-                    <Td className="text-xs text-slate-300">
-                      <div>📧 {c.email || '—'}</div>
-                      <div className="text-slate-400 text-[11px]">📞 {c.phone || '—'}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px]">
-                        <span className="text-slate-400 font-mono">
-                          🪪 {c.revealed_id ? c.revealed_id : (c.government_id ? '••••-••••-' + String(c.government_id).slice(-4) : 'SSN/DL: —')}
-                        </span>
-                        {c.government_id && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const res = await api.contacts.revealSensitive(c.id, 'government_id');
-                                const val = res.data?.value || res.data || 'N/A';
-                                setContacts(prev => prev.map(item => item.id === c.id ? { ...item, revealed_id: val } : item));
-                                toast('Sensitive field unmasked & audit logged in system (Point 22 & 24).', 'info');
-                              } catch (e) {
-                                toast(e.message || 'Failed to reveal sensitive field', 'error');
-                              }
-                            }}
-                            className="text-sky-400 hover:text-sky-300 font-bold px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-[9px] flex items-center gap-1"
-                            title="Click to Reveal SSN/DL & Audit Log"
-                          >
-                            👁️ {c.revealed_id ? 'Hide' : 'Reveal'}
-                          </button>
-                        )}
-                      </div>
-                    </Td>
-                    <Td>
-                      <span className="text-xs font-bold text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/30 px-2.5 py-1 rounded-xl">
-                        ⚖️ {c.linked_matters_count} Matter(s)
-                      </span>
-                    </Td>
-                    <Td className="text-xs text-slate-400 font-mono">
-                      {c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '—'}
-                    </Td>
-                    <Td className="text-right space-x-2">
-                      <button
-                        onClick={() => handleOpenEdit(c)}
-                        className="text-xs font-bold text-slate-300 hover:text-white px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteContact(c)}
-                        className={`text-xs font-bold px-2 py-1 rounded transition-colors ${c.linked_matters_count > 0 ? 'text-slate-600 cursor-not-allowed opacity-50' : 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'}`}
-                        disabled={c.linked_matters_count > 0}
-                        title={c.linked_matters_count > 0 ? 'Cannot delete: Contact is linked to active matter(s)' : 'Delete Contact'}
-                      >
-                        Delete
-                      </button>
-                    </Td>
-                  </Tr>
-                ))}
+                      {c.government_id && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await api.contacts.revealSensitive(c.id, 'government_id');
+                              const val = res.data?.value || res.data || 'N/A';
+                              setContacts(prev => prev.map(item => item.id === c.id ? { ...item, revealed_id: val } : item));
+                              toast('Sensitive field unmasked & audit logged in system (Point 22 & 24).', 'info');
+                            } catch (e) {
+                              toast(e.message || 'Failed to reveal sensitive field', 'error');
+                            }
+                          }}
+                          className="text-sky-400 hover:text-sky-300 font-bold px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-[9px] flex items-center gap-1"
+                          title="Click to Reveal SSN/DL & Audit Log"
+                        >
+                          👁️ {c.revealed_id ? 'Hide' : 'Reveal'}
+                        </button>
+                      )}
+                    </div>
+                  </Td>
+                  <Td>
+                    <span className="text-xs font-bold text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/30 px-2.5 py-1 rounded-xl">
+                      ⚖️ {c.linked_matters_count} Matter(s)
+                    </span>
+                  </Td>
+                  <Td className="text-xs text-slate-400 font-mono">
+                    {c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '—'}
+                  </Td>
+                  <Td className="text-right space-x-2">
+                    <button
+                      onClick={() => handleOpenEdit(c)}
+                      className="text-xs font-bold text-slate-300 hover:text-white px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteContact(c)}
+                      className={`text-xs font-bold px-2 py-1 rounded transition-colors ${c.linked_matters_count > 0 ? 'text-slate-600 cursor-not-allowed opacity-50' : 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'}`}
+                      disabled={c.linked_matters_count > 0}
+                      title={c.linked_matters_count > 0 ? 'Cannot delete: Contact is linked to active matter(s)' : 'Delete Contact'}
+                    >
+                      Delete
+                    </button>
+                  </Td>
+                </Tr>
+              ))}
             </Table>
           </div>
 
@@ -2741,11 +2738,10 @@ export function MatterRelationshipsTab({ caseId, apiMatter, toast }) {
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
-                  categoryFilter === cat
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${categoryFilter === cat
                     ? 'bg-[#0057c7] text-white shadow-md'
                     : 'text-slate-400 hover:text-white'
-                }`}
+                  }`}
               >
                 {cat}
               </button>
@@ -3386,7 +3382,8 @@ export function MatterSettlementTab({ caseId, apiMatter, toast }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -3439,7 +3436,7 @@ export function MatterTasksTab({ caseId, apiMatter, toast }) {
   useEffect(() => {
     api.users.list().then(res => {
       setUsersList(Array.isArray(res.data) ? res.data : []);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   const fetchTasks = useCallback(async () => {
@@ -4080,9 +4077,9 @@ export function MatterCommunicationsTab({ caseId, apiMatter, toast }) {
   }, [caseId, apiMatter]);
 
   useEffect(() => {
-    api.contacts.list().then(res => setContactsList(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+    api.contacts.list().then(res => setContactsList(Array.isArray(res.data) ? res.data : [])).catch(() => { });
     if (numericMatterId) {
-      api.documents.list({ matter_id: numericMatterId, limit: 'all' }).then(res => setDocumentsList(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+      api.documents.list({ matter_id: numericMatterId, limit: 'all' }).then(res => setDocumentsList(Array.isArray(res.data) ? res.data : [])).catch(() => { });
     }
   }, [numericMatterId, matterRefreshTick]);
 
@@ -4585,7 +4582,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         } else if (typeof apiMatter.parties_data === 'string') {
           try {
             existing = JSON.parse(apiMatter.parties_data);
-          } catch(e) {
+          } catch (e) {
             existing = [];
           }
         }
@@ -4595,7 +4592,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
       toast(`Party "${newParty.full_name}" added to matter`, 'success');
       fetchData();
       window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
-    } catch(e) {
+    } catch (e) {
       toast(e.message || 'Failed to add party', 'error');
     }
   };
@@ -4610,7 +4607,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
           } else if (typeof apiMatter.vehicles_data === 'string') {
             try {
               existing = JSON.parse(apiMatter.vehicles_data);
-            } catch(e) {
+            } catch (e) {
               existing = [];
             }
           }
@@ -4627,7 +4624,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
       toast(`${newModule.module_type} attached to matter`, 'success');
       fetchData();
       window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
-    } catch(e) {
+    } catch (e) {
       toast(e.message || 'Failed to attach module', 'error');
     }
   };
@@ -4663,7 +4660,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         setCurrentCase(mapMatterToCaseView(res.data));
       }
       window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
-    } catch(e) {
+    } catch (e) {
       // Revert both states to previous state if API call fails
       setApiMatter(prevMatter);
       setCurrentCase(prevCase);
@@ -4684,7 +4681,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
     if (!caseId) return;
     api.courtForms.listDrafts({ matter_id: caseId })
       .then((res) => setCourtForms(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setCourtFormsLoading(false));
   }, [caseId]);
 
@@ -4695,11 +4692,11 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
       });
       toast('Communication deleted successfully', 'success');
       setShowConfirmDelete(null);
-      
+
       // Refresh case details data
       const res = await api.matters.get(caseId);
       setApiMatter(res.data);
-      
+
       // Sync globally
       window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
     } catch (err) {
@@ -4769,7 +4766,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
     if (isClient || !apiMatter?.id || autoStartedRef.current === caseId) return;
     autoStartedRef.current = caseId;
     let cancelled = false;
-    
+
     const autoStart = async () => {
       try {
         const res = await api.timers.start(apiMatter.id);
@@ -4780,7 +4777,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         // Silently ignore if timer auto-start fails or already active
       }
     };
-    
+
     autoStart();
     return () => { cancelled = true; };
   }, [apiMatter?.id, caseId, isClient]);
@@ -4798,7 +4795,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             keepalive: true
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
     };
@@ -5192,7 +5189,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
       const res = await api.drafts.sendForSignature(esignModalData.draftId, { recipient_email: esignModalData.email });
       const token = res?.data?.token || res?.token || (res?.data && res.data.id ? res.data.id : null);
       const url = token ? `${window.location.origin}/sign/${token}` : `${window.location.origin}/sign`;
-      
+
       setEsignModalData(prev => ({
         ...prev,
         token,
@@ -5527,11 +5524,11 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         bcc: c.bcc,
         repliesCount: c._count?.replies || 0,
         date: new Date(c.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
-        icon: c.communication_type === 'email_log' 
+        icon: c.communication_type === 'email_log'
           ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-          : c.communication_type === 'call_log' 
+          : c.communication_type === 'call_log'
             ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-            : c.communication_type === 'meeting_log' 
+            : c.communication_type === 'meeting_log'
               ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
               : <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
         visibility: c.visibility,
@@ -5572,7 +5569,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
     const open = invs.filter((i) => i.status !== 'paid' && i.due_date);
     open.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
     const nextInv = open[0];
-    
+
     // Add upcoming court appearances
     const upcomingCourtEvents = matterEvents.filter(e => (e.is_court_event || e.court_related) && new Date(e.date) >= new Date());
     upcomingCourtEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -5667,7 +5664,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
     <div className="animate-fade-in space-y-6">
       {/* Navigation & Actions */}
       <div className="flex items-center justify-between pb-2 gap-3 flex-wrap">
-        <button onClick={() => navigate(isClient ? '/client/matters' : role === 'lawyer' ? '/lawyer/matters' : '/admin/matters')} 
+        <button onClick={() => navigate(isClient ? '/client/matters' : role === 'lawyer' ? '/lawyer/matters' : '/admin/matters')}
           className="btn btn-secondary h-9 px-3 flex items-center gap-2 group transition-all">
           <svg className="w-4 h-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M15 18l-6-6 6-6" /></svg>
           <span className="text-[12px] font-700 uppercase tracking-widest">Back to Matters</span>
@@ -5691,7 +5688,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         <div className="absolute top-0 left-0 w-1.5 h-full bg-[#0057c7]" />
         {/* Background Accent */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#0057c7]/5 rounded-full blur-3xl pointer-events-none -mr-32 -mt-32" />
-        
+
         <div className={`relative z-10 flex justify-between items-start gap-8 flex-wrap ${isClient ? 'items-center' : ''}`}>
           <div className="flex-1 min-w-[300px]">
             <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -5833,7 +5830,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                     <div className="h-px w-12 bg-white/10" />
                     <span className="text-[12px] font-800 text-[#38bdf8] uppercase tracking-widest animate-pulse">Live Tracking Active</span>
                   </div>
-                  
+
                   <div className="flex items-start gap-6">
                     <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center text-3xl border border-white/10 shadow-inner">
                       {currentCase.status === 'active' ? '⚡' : currentCase.status === 'pending' ? '⏳' : '✅'}
@@ -5890,7 +5887,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                     </div>
                     <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/40 uppercase">CLIENT VISIBLE</span>
                   </div>
-                  
+
                   <Textarea
                     rows={2}
                     value={portalNote}
@@ -6132,7 +6129,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                   const diffTime = expiryDate - new Date();
                   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                   const formattedTerm = apiMatter.sol_term === '1_year' ? '1 Year' : apiMatter.sol_term === '2_years' ? '2 Years' : 'Custom';
-                  
+
                   let alertClass = "bg-[#0057c7]/10 border-[#0057c7]/20 text-[#38bdf8]";
                   let badgeClass = "bg-[#0057c7]/20 text-[#38bdf8] border-[#0057c7]/30";
                   let statusText = `${diffDays} days remaining`;
@@ -6259,13 +6256,13 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                   const refSource = apiMatter?.referral_source || apiMatter?.lead_source || apiMatter?.intake_answers?.referral_source || 'Direct Intake';
 
                   const isCrpcConsented = Boolean(
-                    apiMatter?.crpc_151_consented || 
-                    apiMatter?.intake_answers?.crpc_151_consent_obtained || 
+                    apiMatter?.crpc_151_consented ||
+                    apiMatter?.intake_answers?.crpc_151_consent_obtained ||
                     apiMatter?.crpc_consent
                   );
 
                   const isAgreementOnFile = Boolean(
-                    apiMatter?.referral_agreement_on_file || 
+                    apiMatter?.referral_agreement_on_file ||
                     apiMatter?.intake_answers?.referral_agreement_on_file
                   );
 
@@ -6291,8 +6288,8 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                         <div className="bg-white/[0.02] p-3 rounded-xl border border-white/5">
                           <span className="text-slate-400 text-[11px] block font-medium">Unbilled Time</span>
                           <span className="text-[#38bdf8] font-extrabold text-xs block mt-0.5 font-mono">
-                            {totalUnbilledHours > 0 
-                              ? `${totalUnbilledHours.toFixed(1)} hrs ($${totalUnbilledAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` 
+                            {totalUnbilledHours > 0
+                              ? `${totalUnbilledHours.toFixed(1)} hrs ($${totalUnbilledAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
                               : '0.0 hrs ($0.00)'}
                           </span>
                         </div>
@@ -6421,8 +6418,8 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                       setMatterSubfolderPath([]);
                     }}
                     className={`p-5 rounded-2xl border transition-all cursor-pointer group shadow-lg ${documentsFolderFilter === folder
-                        ? 'border-[#38bdf8] bg-[#0057c7]/10 ring-4 ring-[#0057c7]/20 shadow-[0_8px_30px_rgba(0,87,199,0.2)]'
-                        : 'border-white/5 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]'
+                      ? 'border-[#38bdf8] bg-[#0057c7]/10 ring-4 ring-[#0057c7]/20 shadow-[0_8px_30px_rgba(0,87,199,0.2)]'
+                      : 'border-white/5 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]'
                       }`}
                   >
                     <div className="flex items-center justify-between mb-4">
@@ -6430,7 +6427,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                       </span>
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white font-900 text-[13px] border border-white/10">
-                         {docs.filter((d) => documentFolderBucket(d.category) === folder || (d.folder_path && (d.folder_path === folder || d.folder_path.startsWith(folder + '/')))).length}
+                        {docs.filter((d) => documentFolderBucket(d.category) === folder || (d.folder_path && (d.folder_path === folder || d.folder_path.startsWith(folder + '/')))).length}
                       </div>
                     </div>
                     <p className={`text-[14px] font-800 leading-tight ${documentsFolderFilter === folder ? 'text-[#38bdf8]' : 'text-white'}`}>{folder}</p>
@@ -6457,7 +6454,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                     </select>
                     <div className="relative">
                       <input className="text-[13px] bg-white/[0.03] border border-white/10 rounded-xl pl-9 pr-4 py-2 w-full sm:w-64 outline-none focus:border-[#38bdf8] text-white transition-all" placeholder="Search objects..." value={docSearchTerm} onChange={e => setDocSearchTerm(e.target.value)} />
-                      <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8a94a6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                      <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8a94a6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
                     </div>
                   </div>
                 </div>
@@ -6465,7 +6462,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                 {/* Breadcrumbs for Matter subfolders */}
                 {documentsFolderFilter && (
                   <div className="flex items-center gap-2 text-[11px] font-800 text-[#8a94a6] bg-white/[0.02] border border-white/5 px-4 py-2.5 rounded-xl uppercase tracking-wider mb-6">
-                    <span 
+                    <span
                       className="hover:text-white cursor-pointer transition-colors"
                       onClick={() => {
                         setMatterSubfolderPath([]);
@@ -6476,7 +6473,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                     {matterSubfolderPath.map((segment, idx) => (
                       <React.Fragment key={idx}>
                         <span className="text-white/20">/</span>
-                        <span 
+                        <span
                           className="hover:text-white cursor-pointer transition-colors"
                           onClick={() => {
                             setMatterSubfolderPath(prev => prev.slice(0, idx + 1));
@@ -6561,7 +6558,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                           </button>
                         </div>
                       </Td>
-                     </Tr>
+                    </Tr>
                   ))}
                 </Table>
               </Card>
@@ -6598,7 +6595,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                     <div key={item.id} className="p-6 rounded-2xl border border-white/5 bg-white/[0.03] hover:bg-white/[0.05] transition-all group shadow-2xl relative overflow-hidden">
                       {/* Background Accent for draft status */}
                       <div className={`absolute top-0 right-0 w-32 h-32 opacity-[0.02] pointer-events-none transform translate-x-1/2 -translate-y-1/2 rounded-full ${item.status === 'signed' ? 'bg-emerald-500' : 'bg-[#0057c7]'}`} />
-                      
+
                       {(() => {
                         const displayStatus = isClient ? clientStatus(item.status) : draftUiStatus(item.status);
                         return (
@@ -6612,12 +6609,12 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                                 </div>
                               </div>
                               <span className={`text-[10px] font-900 px-3 py-1 rounded-lg uppercase tracking-[0.2em] border shadow-lg ${displayStatus === 'Draft'
-                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                  : displayStatus === 'Ready'
-                                    ? 'bg-[#0057c7]/10 text-[#38bdf8] border-[#0057c7]/20'
-                                    : displayStatus === 'Sent for Signature' || displayStatus === 'Pending Signature'
-                                      ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10'
-                                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
+                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                : displayStatus === 'Ready'
+                                  ? 'bg-[#0057c7]/10 text-[#38bdf8] border-[#0057c7]/20'
+                                  : displayStatus === 'Sent for Signature' || displayStatus === 'Pending Signature'
+                                    ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10'
+                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
                                 }`}>
                                 {displayStatus}
                               </span>
@@ -6685,7 +6682,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                             <span className="text-[10px] text-[#8a94a6] font-900 uppercase tracking-widest whitespace-nowrap opacity-60">{com.date}</span>
                             {!isClient && (
                               <>
-                                <button 
+                                <button
                                   onClick={() => openModal('compose-email', {
                                     id: com.id,
                                     matterId: com.matter_id,
@@ -6699,7 +6696,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                                 >
                                   Edit
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => setShowConfirmDelete(com.id)}
                                   className="text-red-400/80 hover:text-red-400 text-[10px] font-900 uppercase tracking-widest transition-all cursor-pointer"
                                 >
@@ -7205,9 +7202,8 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                             <p className="text-[#8a94a6] text-xs mt-0.5">{f.template?.title}</p>
                           </Td>
                           <Td>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border capitalize ${
-                              f.status === 'completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                            }`}>{f.status}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border capitalize ${f.status === 'completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                              }`}>{f.status}</span>
                           </Td>
                           <Td className="text-sm text-[#8a94a6]">{f.creator?.full_name || '—'}</Td>
                           <Td className="text-sm text-[#8a94a6]">{new Date(f.updated_at).toLocaleDateString()}</Td>
@@ -7725,12 +7721,12 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
               </div>
               <div className="mt-4 pt-4 border-t border-white/10">
                 <span className={`inline-flex text-[10px] font-900 px-3 py-1 rounded-lg uppercase tracking-[0.2em] border shadow-lg ${previewDraft.status === 'Draft'
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/10'
-                    : previewDraft.status === 'Ready'
-                      ? 'bg-[#0057c7]/10 text-[#38bdf8] border-[#0057c7]/20 shadow-[#0057c7]/10'
-                      : previewDraft.status === 'Sent for Signature' || previewDraft.status === 'Pending Signature'
-                        ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/10'
+                  : previewDraft.status === 'Ready'
+                    ? 'bg-[#0057c7]/10 text-[#38bdf8] border-[#0057c7]/20 shadow-[#0057c7]/10'
+                    : previewDraft.status === 'Sent for Signature' || previewDraft.status === 'Pending Signature'
+                      ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10'
                   }`}>
                   {previewDraft.status}
                 </span>
@@ -7775,12 +7771,12 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                 </div>
 
                 <Field label="Recipient Client Email Address" required>
-                  <Input 
-                    type="email" 
-                    value={esignModalData.email} 
+                  <Input
+                    type="email"
+                    value={esignModalData.email}
                     onChange={e => setEsignModalData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="client@example.com" 
-                    required 
+                    placeholder="client@example.com"
+                    required
                   />
                 </Field>
 
@@ -7804,8 +7800,8 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">E-Sign Signing Link (Shareable)</label>
                     <div className="flex items-center gap-2 bg-[#090d16] border border-white/10 rounded-xl p-2.5">
                       <input type="text" readOnly value={esignModalData.url} className="bg-transparent text-xs text-emerald-400 font-mono flex-1 outline-none truncate" />
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => {
                           navigator.clipboard.writeText(esignModalData.url);
                           toast('E-Sign link copied to clipboard!', 'success');
@@ -7820,10 +7816,10 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
 
                 <div className="flex justify-between items-center pt-4 border-t border-white/10">
                   {esignModalData.url && (
-                    <a 
-                      href={esignModalData.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                    <a
+                      href={esignModalData.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="btn btn-primary text-xs px-4 bg-[#0057c7] text-white flex items-center gap-1.5 font-bold"
                     >
                       <span>🚀</span> Open Signing Portal
@@ -7924,7 +7920,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const [editingCatId, setEditingCatId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [error, setError] = useState('');
@@ -7973,7 +7969,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
       setEvents(calRes.data || []);
       const mats = Array.isArray(matRes.data) ? matRes.data : [];
       setMatterPick(mats.map((m) => ({ id: m.id, label: m.matter_number || String(m.id) })));
-      
+
       // Ensure all loaded categories have a sort_order
       const sortedCats = (catsRes.data || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       setCategories(sortedCats);
@@ -8074,12 +8070,12 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const getEventColor = (e) => {
     if (e.type === 'invoice') return '#f59e0b';
     if (e.type === 'matter') return '#38bdf8';
-    
+
     if (e.categories && Array.isArray(e.categories) && e.categories.length > 0) {
       const cat = categories.find(c => c.name.toLowerCase() === e.categories[0].toLowerCase());
       if (cat) return cat.color;
     }
-    
+
     const typeColors = {
       hearing: '#ef4444',
       meeting: '#10b981',
@@ -8289,8 +8285,8 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const headerSubtitle = viewMode === 'month'
     ? `${monthName} ${year} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
     : viewMode === 'week'
-    ? `Week of ${navLabel} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
-    : `${viewDate.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`;
+      ? `Week of ${navLabel} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
+      : `${viewDate.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`;
 
   const getTypeStyle = (type) => {
     switch (type) {
@@ -8360,8 +8356,8 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const agendaTitle = viewMode === 'day'
     ? `Agenda: ${viewDate.toLocaleString('en-US', { month: 'short', day: 'numeric' })}`
     : viewMode === 'week'
-    ? 'Agenda: This Week'
-    : `Agenda: ${monthName}`;
+      ? 'Agenda: This Week'
+      : `Agenda: ${monthName}`;
 
   const isOverdue = (date) => {
     const p = getPacificParts(date);
@@ -8426,11 +8422,10 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
           <button
             type="button"
             onClick={() => setIsViewDropdownOpen(prev => !prev)}
-            className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-[12px] font-800 uppercase tracking-wider transition-all cursor-pointer ${
-              isViewDropdownOpen
+            className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-[12px] font-800 uppercase tracking-wider transition-all cursor-pointer ${isViewDropdownOpen
                 ? 'bg-[#0057c7]/20 border-2 border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]'
                 : 'bg-white/[0.04] border border-white/10 text-white/90 hover:bg-white/[0.08] hover:border-white/20 hover:text-white'
-            }`}
+              }`}
           >
             <span>{viewMode === 'day' ? 'Day' : viewMode === 'week' ? 'Week' : 'Month'}</span>
             <svg
@@ -8463,11 +8458,10 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                       setViewMode(opt.id);
                       setIsViewDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-lg text-[13px] font-semibold transition-all flex items-center justify-between cursor-pointer ${
-                      isSelected
+                    className={`w-full text-left px-3.5 py-2.5 rounded-lg text-[13px] font-semibold transition-all flex items-center justify-between cursor-pointer ${isSelected
                         ? 'bg-[#0057c7]/20 text-[#38bdf8] font-bold'
                         : 'text-white/80 hover:bg-white/10 hover:text-white'
-                    }`}
+                      }`}
                     role="menuitem"
                   >
                     <span>{opt.label}</span>
@@ -8571,7 +8565,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                               alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 ml-1"></span>;
                             }
                           }
-                          
+
                           return (
                             <div
                               key={j}
@@ -8600,9 +8594,8 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                   <div
                     key={w.dateStr}
                     onClick={() => { setViewDate(w.date); setViewMode('day'); }}
-                    className={`py-3.5 px-2 text-center border-r border-white/5 last:border-r-0 cursor-pointer hover:bg-white/[0.04] transition-colors ${
-                      w.isToday ? 'bg-[#0057c7]/10' : ''
-                    }`}
+                    className={`py-3.5 px-2 text-center border-r border-white/5 last:border-r-0 cursor-pointer hover:bg-white/[0.04] transition-colors ${w.isToday ? 'bg-[#0057c7]/10' : ''
+                      }`}
                     title="Click to view this Day"
                   >
                     <div className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em]">
@@ -8610,11 +8603,10 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                     </div>
                     <div className="mt-1 flex items-center justify-center">
                       <span
-                        className={`w-7 h-7 flex items-center justify-center text-[13px] rounded-xl transition-all ${
-                          w.isToday
+                        className={`w-7 h-7 flex items-center justify-center text-[13px] rounded-xl transition-all ${w.isToday
                             ? 'bg-gradient-to-br from-[#0057c7] to-[#38bdf8] text-white font-900 shadow-[0_4px_12px_rgba(56,189,248,0.4)]'
                             : 'text-white/80 font-800'
-                        }`}
+                          }`}
                       >
                         {w.dayNumber}
                       </span>
@@ -8631,9 +8623,8 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                     <div
                       key={w.dateStr}
                       onClick={() => openModal('add-event', { date: w.dateStr })}
-                      className={`p-2 flex flex-col justify-between cursor-pointer transition-all hover:bg-white/[0.03] group relative ${
-                        w.isToday ? 'bg-white/[0.01]' : ''
-                      }`}
+                      className={`p-2 flex flex-col justify-between cursor-pointer transition-all hover:bg-white/[0.03] group relative ${w.isToday ? 'bg-white/[0.01]' : ''
+                        }`}
                     >
                       <div className="space-y-1.5 relative z-10 flex-1">
                         {evts.map((e, j) => {
@@ -8879,7 +8870,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                     className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-[#38bdf8]/30 transition-all group cursor-pointer shadow-lg hover:shadow-xl relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 w-24 h-24 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/15 transition-all duration-500" />
-                    
+
                     {/* Left Date Block */}
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 flex flex-col items-center justify-center flex-shrink-0 group-hover:scale-105 group-hover:border-[#38bdf8]/40 transition-all shadow-inner">
                       <span className="text-[9px] font-900 text-[#38bdf8] uppercase tracking-wider leading-none">
@@ -8923,7 +8914,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                     </div>
 
                     {/* Right indicator dot */}
-                    <div 
+                    <div
                       className="w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]"
                       style={{ color: evColor, backgroundColor: evColor }}
                       title={e.type || 'Event'}
@@ -9013,7 +9004,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                 >
                   {showArchived ? 'Hide Archived' : 'Show Archived'}
                 </button>
-                <button 
+                <button
                   onClick={() => setIsManageCatsOpen(false)}
                   className="w-8 h-8 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/50 hover:text-white transition-colors"
                 >
@@ -9030,14 +9021,14 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                   <div key={cat.id} className={`flex items-center justify-between p-3.5 bg-white/[0.02] border border-white/5 rounded-xl gap-3 ${!cat.is_active ? 'opacity-50 grayscale' : ''}`}>
                     {isEditing ? (
                       <div className="flex items-center gap-2 flex-grow">
-                        <input 
-                          type="color" 
-                          value={editColor} 
+                        <input
+                          type="color"
+                          value={editColor}
                           onChange={e => setEditColor(e.target.value)}
                           className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 outline-none flex-shrink-0"
                         />
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={editName}
                           onChange={e => setEditName(e.target.value)}
                           className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-[13px] text-white outline-none focus:border-[#38bdf8] flex-grow"
@@ -9050,7 +9041,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                         <div className="flex items-center gap-3 min-w-0">
                           {/* Reordering arrows */}
                           <div className="flex flex-col gap-0.5 mr-1">
-                            <button 
+                            <button
                               onClick={() => handleMoveCategory(cat, 'up')}
                               disabled={idx === 0}
                               className="p-0.5 text-white/40 hover:text-white disabled:opacity-20 transition-colors"
@@ -9058,7 +9049,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                             >
                               ▲
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleMoveCategory(cat, 'down')}
                               disabled={idx === arr.length - 1}
                               className="p-0.5 text-white/40 hover:text-white disabled:opacity-20 transition-colors"
@@ -9074,14 +9065,14 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                           )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <button 
+                          <button
                             onClick={() => startEdit(cat)}
                             className="w-7 h-7 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg flex items-center justify-center text-white/70 hover:text-white transition-colors"
                             title="Edit Category"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleToggleArchive(cat)}
                             className={`w-7 h-7 border rounded-lg flex items-center justify-center transition-colors ${cat.is_active ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-400 hover:text-amber-300' : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400 hover:text-emerald-300'}`}
                             title={cat.is_active ? 'Archive Category' : 'Activate Category'}
@@ -9092,7 +9083,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12" /></svg>
                             )}
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDeleteCat(cat.id)}
                             className="w-7 h-7 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg flex items-center justify-center text-red-400 hover:text-red-300 transition-colors"
                             title="Delete Category"
@@ -9111,21 +9102,21 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
             <div className="p-6 border-t border-white/5 bg-white/[0.01] space-y-3">
               <h4 className="text-[11px] font-900 text-white uppercase tracking-wider">Create New Category</h4>
               <div className="flex items-center gap-2">
-                <input 
-                  type="color" 
-                  value={newCatColor} 
+                <input
+                  type="color"
+                  value={newCatColor}
                   onChange={e => setNewCatColor(e.target.value)}
                   className="w-9 h-9 rounded-xl cursor-pointer bg-transparent border-0 outline-none flex-shrink-0"
                 />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="E.g., Client Consultation"
                   value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
                   className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[13px] text-white outline-none focus:border-[#38bdf8] flex-grow font-600"
                 />
-                <button 
-                  onClick={handleAddCategory} 
+                <button
+                  onClick={handleAddCategory}
                   className="btn btn-primary h-9 px-4 font-800 text-[11px] uppercase tracking-widest shrink-0"
                 >
                   Create
@@ -9306,8 +9297,8 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
                 setCurrentPathSegments([]);
               }}
               className={`flex flex-col items-center p-5 rounded-2xl border cursor-pointer transition-all group relative overflow-hidden ${selectedFolder === f.name
-                  ? 'border-[#f59e0b] bg-[#f59e0b]/5 ring-1 ring-[#f59e0b]/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
-                  : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/10'
+                ? 'border-[#f59e0b] bg-[#f59e0b]/5 ring-1 ring-[#f59e0b]/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
+                : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/10'
                 }`}
             >
               <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none group-hover:opacity-[0.06] transition-opacity">
@@ -9344,7 +9335,7 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
         {/* Breadcrumbs for global view subfolders */}
         {selectedFolder && (
           <div className="flex items-center gap-2 text-[11px] font-800 text-[#8a94a6] bg-white/[0.02] border border-white/5 px-4 py-2.5 rounded-xl uppercase tracking-wider mb-6">
-            <span 
+            <span
               className="hover:text-white cursor-pointer transition-colors"
               onClick={() => {
                 setCurrentPathSegments([]);
@@ -9355,7 +9346,7 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
             {currentPathSegments.map((segment, idx) => (
               <React.Fragment key={idx}>
                 <span className="text-white/20">/</span>
-                <span 
+                <span
                   className="hover:text-white cursor-pointer transition-colors"
                   onClick={() => {
                     setCurrentPathSegments(prev => prev.slice(0, idx + 1));
@@ -9388,7 +9379,7 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
             ))}
           </div>
         )}
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {paginatedDocs.length > 0 ? paginatedDocs.map(d => (
             <div key={d.id} className="flex flex-col gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] hover:border-[#38bdf8]/30 transition-all group cursor-pointer shadow-xl relative overflow-hidden">
@@ -9485,11 +9476,10 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
                     key={pageNum}
                     type="button"
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                      currentPage === pageNum
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${currentPage === pageNum
                         ? 'bg-[#38bdf8] text-black shadow-lg shadow-[#38bdf8]/20'
                         : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
+                      }`}
                   >
                     {pageNum}
                   </button>
@@ -9513,7 +9503,7 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-[#0a0f1a] border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
-            
+
             <div className="flex items-center gap-4 mb-4 relative z-10">
               <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center shrink-0 border border-red-500/20">
                 <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -9525,12 +9515,12 @@ export function DocumentsPage({ toast, openModal, role = 'lawyer' }) {
                 <p className="text-xs text-[#8a94a6] font-500 mt-1">This action cannot be undone.</p>
               </div>
             </div>
-            
+
             <p className="text-sm text-white/80 mb-6 bg-white/5 p-3 rounded-lg border border-white/5 break-words line-clamp-2">
               <span className="font-700 opacity-50 mr-2">File:</span>
               <span className="font-800 text-white">{documentToDelete.name}</span>
             </p>
-            
+
             <div className="flex gap-3 relative z-10">
               <button
                 onClick={() => setDocumentToDelete(null)}
@@ -9591,8 +9581,8 @@ export function BillingPage({ openModal, toast, navigate, role = 'lawyer' }) {
     if (isFirstLoad.current) { setBillLoading(true); isFirstLoad.current = false; }
     setBillError('');
     try {
-      const fetchAdminSettings = role === 'admin' 
-        ? api.dashboard.admin().then(r => r.data?.settings || {}) 
+      const fetchAdminSettings = role === 'admin'
+        ? api.dashboard.admin().then(r => r.data?.settings || {})
         : Promise.resolve({});
 
       const [invRes, timerRes, settingsRes, trustRes, expRes] = await Promise.all([
@@ -9624,12 +9614,12 @@ export function BillingPage({ openModal, toast, navigate, role = 'lawyer' }) {
     if (!isAdmin) {
       return { unbilled: '—', draft: '$0.00', ar: '$0.00', mtd: '$0.00' };
     }
-    
+
     let draft = 0;
     let ar = 0;
     let mtd = 0;
     const startMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    
+
     apiInvoices.forEach((inv) => {
       const totalAmt = Number(inv.amount);
       const paidAmt = inv.paid_amount ?? (inv.payments || []).reduce((s, p) => s + Number(p.amount), 0);
@@ -9761,7 +9751,7 @@ export function BillingPage({ openModal, toast, navigate, role = 'lawyer' }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Unbilled Time" value={adminStats.unbilled} change="+8.2%"
           icon={<svg className="w-6 h-6 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Draft Invoices" value={adminStats.draft} 
+        <StatCard label="Draft Invoices" value={adminStats.draft}
           icon={<svg className="w-6 h-6 text-[#94a3b8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
         <StatCard label="Outstanding (A/R)" value={adminStats.ar} change="-2.4%"
           icon={<svg className="w-6 h-6 text-[#f59e0b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /><path d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07l-1.41 1.41M6.34 17.66l-1.41 1.41M17.66 17.66l1.41 1.41M6.34 6.34l1.41-1.41" /></svg>} />
@@ -9819,10 +9809,10 @@ export function BillingPage({ openModal, toast, navigate, role = 'lawyer' }) {
       {tab === 'Trust Accounts' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-             <button onClick={() => openModal('trust-deposit')} className="btn btn-primary shadow-[#0057c7]/20">
-               <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-               Trust Deposit
-             </button>
+            <button onClick={() => openModal('trust-deposit')} className="btn btn-primary shadow-[#0057c7]/20">
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              Trust Deposit
+            </button>
           </div>
           <Card className="!p-0 overflow-hidden border-white/5 bg-white/[0.02]">
             <Table headers={['Client Entity', 'Account Identifier', 'Current Balance', 'Last Activity', 'Lifecycle', 'Operations']}>
@@ -10057,7 +10047,7 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
       });
       toast('Communication deleted successfully', 'success');
       setShowConfirmDelete(null);
-      
+
       setCommList((prev) => {
         const remaining = prev.filter((c) => c.id !== commId);
         if (selected?.id === commId) {
@@ -10125,7 +10115,7 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
     }
   };
 
-  const inbox = commList.filter(e => 
+  const inbox = commList.filter(e =>
     e.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.preview.toLowerCase().includes(searchQuery.toLowerCase())
@@ -10164,10 +10154,10 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
           {/* Global Inbox Sidebar */}
           <div className={`w-full lg:w-80 flex-shrink-0 border-r border-white/5 flex flex-col bg-white/[0.01] ${selected ? 'hidden lg:flex' : 'flex'}`}>
             <div className="p-4 border-b border-white/5 bg-white/[0.02]">
-              <SearchInput 
-                placeholder="Search transmissions..." 
-                value={searchQuery} 
-                onChange={(val) => setSearchQuery(val)} 
+              <SearchInput
+                placeholder="Search transmissions..."
+                value={searchQuery}
+                onChange={(val) => setSearchQuery(val)}
               />
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -10201,7 +10191,7 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
                     <div className="flex gap-2 items-center flex-wrap">
                       {isAdmin && (
                         <>
-                          <button 
+                          <button
                             onClick={() => openModal('compose-email', {
                               id: selected.id,
                               matterId: selected.matter_id,
@@ -10210,7 +10200,7 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
                               bcc: selected.bcc,
                               subject: selected.subject,
                               message: selected.body
-                            })} 
+                            })}
                             className="h-9 px-3.5 rounded-xl text-[10px] font-900 uppercase tracking-widest bg-white/5 text-white hover:bg-white/10 border border-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
                           >
                             <svg className="w-3.5 h-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -10218,8 +10208,8 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
                             </svg>
                             Edit
                           </button>
-                          
-                          <button 
+
+                          <button
                             onClick={() => setShowConfirmDelete(selected.id)}
                             className="h-9 px-3.5 rounded-xl text-[10px] font-900 uppercase tracking-widest bg-red-950/20 text-red-400 hover:bg-red-900/30 border border-red-500/10 transition-all flex items-center gap-1.5 cursor-pointer"
                           >
@@ -10228,11 +10218,11 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
                             </svg>
                             Delete
                           </button>
-                          
+
                           <div className="h-4 w-px bg-white/10 mx-1" />
                         </>
                       )}
-                      
+
                       <button onClick={() => setAction('reply')} className={`h-9 px-4 rounded-xl text-[10px] font-900 uppercase tracking-widest transition-all ${action === 'reply' ? 'bg-[#0057c7] text-white' : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'}`}>Reply</button>
                       <button onClick={() => setAction('forward')} className={`h-9 px-4 rounded-xl text-[10px] font-900 uppercase tracking-widest transition-all ${action === 'forward' ? 'bg-[#0057c7] text-white' : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'}`}>Forward</button>
                     </div>
@@ -10421,7 +10411,7 @@ export function AIPage({ toast }) {
 // ─────────────────────────────────────────────────────────
 export function UsersPage({ toast, openModal, user }) {
   const [users, setUsers] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [error, setError] = useState('');
@@ -10476,8 +10466,8 @@ export function UsersPage({ toast, openModal, user }) {
         if (values.role_client) selectedRoles.push('client');
 
         if (selectedRoles.length === 0) {
-           toast('You must select at least one role.', 'error');
-           return;
+          toast('You must select at least one role.', 'error');
+          return;
         }
 
         const specialtyVal = values.specialty === 'other'
@@ -10557,12 +10547,12 @@ export function UsersPage({ toast, openModal, user }) {
             if (values.role_client) selectedRoles.push('client');
 
             if (selectedRoles.length === 0) {
-               toast('You must select at least one role.', 'error');
-               return;
+              toast('You must select at least one role.', 'error');
+              return;
             }
 
             await api.users.create({
-              full_name: `${values.firstName} ${values.lastName}`,
+              full_name: [values.firstName, values.middleName, values.lastName].filter(Boolean).map(s => s.trim()).join(' '),
               email: values.email,
               password: values.password,
               roles: selectedRoles,
@@ -10583,11 +10573,10 @@ export function UsersPage({ toast, openModal, user }) {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-2 rounded-xl text-[12px] font-900 uppercase tracking-widest transition-all ${
-              activeTab === tab
+            className={`px-6 py-2 rounded-xl text-[12px] font-900 uppercase tracking-widest transition-all ${activeTab === tab
                 ? 'bg-[#0057c7] text-white shadow-lg shadow-[#0057c7]/20'
                 : 'text-[#8a94a6] hover:text-white hover:bg-white/5'
-            }`}
+              }`}
           >
             {tab}
           </button>
@@ -10609,13 +10598,12 @@ export function UsersPage({ toast, openModal, user }) {
               </Td>
               <Td><span className="text-[13px] font-600 text-white/70">{u.email}</span></Td>
               <Td>
-                <span className={`text-[10px] font-900 px-3 py-1 rounded-lg uppercase tracking-[0.1em] border shadow-sm ${
-                  u.roleLabel === 'Admin' 
-                    ? 'bg-[#C9A24A]/10 text-[#C9A24A] border-[#C9A24A]/20' 
+                <span className={`text-[10px] font-900 px-3 py-1 rounded-lg uppercase tracking-[0.1em] border shadow-sm ${u.roleLabel === 'Admin'
+                    ? 'bg-[#C9A24A]/10 text-[#C9A24A] border-[#C9A24A]/20'
                     : u.roleLabel === 'Lawyer'
-                    ? 'bg-[#38bdf8]/10 text-[#38bdf8] border-[#38bdf8]/20'
-                    : 'bg-white/5 text-[#8a94a6] border-white/10'
-                }`}>
+                      ? 'bg-[#38bdf8]/10 text-[#38bdf8] border-[#38bdf8]/20'
+                      : 'bg-white/5 text-[#8a94a6] border-white/10'
+                  }`}>
                   {u.roleLabel}
                 </span>
               </Td>
@@ -10624,16 +10612,16 @@ export function UsersPage({ toast, openModal, user }) {
               <Td><span className="text-[12px] font-600 text-[#8a94a6]">{u.lastLogin}</span></Td>
               <Td>
                 <div className="flex gap-2.5">
-                  <button onClick={() => openModal('reset-password', u)} 
+                  <button onClick={() => openModal('reset-password', u)}
                     className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-[#8a94a6] hover:bg-[#10b981]/10 hover:text-[#10b981] hover:border-[#10b981]/30 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all border border-white/10 group" title="Reset Password">
                     <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                   </button>
-                  <button onClick={() => handleEdit(u)} 
+                  <button onClick={() => handleEdit(u)}
                     className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-[#8a94a6] hover:bg-[#38bdf8]/10 hover:text-[#38bdf8] hover:border-[#38bdf8]/30 hover:shadow-[0_0_15px_rgba(56,189,248,0.2)] transition-all border border-white/10 group" title="Edit User">
                     <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   </button>
                   {user?.id !== u.id && (
-                    <button onClick={() => handleDelete(u)} 
+                    <button onClick={() => handleDelete(u)}
                       className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-[#8a94a6] hover:bg-[#ef4444]/10 hover:text-[#ef4444] hover:border-[#ef4444]/30 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all border border-white/10 group" title="Terminate Access">
                       <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
@@ -10677,7 +10665,7 @@ export function UsersPage({ toast, openModal, user }) {
 function PracticeAreasTab({ toast }) {
   const [areas, setAreas] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
 
@@ -10749,7 +10737,7 @@ function PracticeAreasTab({ toast }) {
           footer={
             <>
               <button onClick={() => setDeleteTarget(null)} className="btn btn-secondary btn-sm">Cancel</button>
-              <button 
+              <button
                 onClick={async () => {
                   try {
                     await api.practiceAreas.remove(deleteTarget.id);
@@ -10759,7 +10747,7 @@ function PracticeAreasTab({ toast }) {
                   } catch (e) {
                     toast(e.message || 'Failed to delete practice area', 'error');
                   }
-                }} 
+                }}
                 className="btn btn-primary btn-sm !bg-red-500 hover:!bg-red-600 !border-red-500"
               >
                 Delete
@@ -10791,7 +10779,7 @@ function PracticeAreasTab({ toast }) {
 function CustomFieldsTab({ toast }) {
   const [fields, setFields] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
 
@@ -10864,7 +10852,7 @@ function CustomFieldsTab({ toast }) {
           footer={
             <>
               <button onClick={() => setDeleteTarget(null)} className="btn btn-secondary btn-sm">Cancel</button>
-              <button 
+              <button
                 onClick={async () => {
                   try {
                     await api.customFields.remove(deleteTarget.id);
@@ -10874,7 +10862,7 @@ function CustomFieldsTab({ toast }) {
                   } catch (e) {
                     toast(e.message || 'Failed to delete custom field', 'error');
                   }
-                }} 
+                }}
                 className="btn btn-primary btn-sm !bg-red-500 hover:!bg-red-600 !border-red-500"
               >
                 Delete
@@ -10944,7 +10932,7 @@ function IntakeModulesTab({ toast }) {
     const temp = reordered[index];
     reordered[index] = reordered[targetIdx];
     reordered[targetIdx] = temp;
-    
+
     const payload = reordered.map((m, idx) => ({ id: m.id, display_order: idx + 1 }));
     setModules(reordered);
     try {
@@ -11340,11 +11328,11 @@ export function IntegrationsPage({ toast }) {
   };
 
   const integrationCards = [
-    { 
-      title: 'Titan Email & Calendar', 
-      subtitle: titanAccounts.length > 0 ? `Sync firm communications & calendars. (${titanAccounts.length} account${titanAccounts.length === 1 ? '' : 's'} connected)` : 'Sync firm communications & calendars.', 
-      connected: titanAccounts.length > 0, 
-      action: () => setIsManageTitanAccountsOpen(true) 
+    {
+      title: 'Titan Email & Calendar',
+      subtitle: titanAccounts.length > 0 ? `Sync firm communications & calendars. (${titanAccounts.length} account${titanAccounts.length === 1 ? '' : 's'} connected)` : 'Sync firm communications & calendars.',
+      connected: titanAccounts.length > 0,
+      action: () => setIsManageTitanAccountsOpen(true)
     },
     {
       title: 'Zoom Video Meetings',
@@ -11393,13 +11381,12 @@ export function IntegrationsPage({ toast }) {
               </span>
             </div>
             <div className="flex justify-end pt-5 mt-auto border-t border-white/5">
-              <button type="button" onClick={item.action} disabled={loading} className={`h-9 px-4 rounded-xl text-[10px] font-900 uppercase tracking-widest transition-all ${
-                item.title.startsWith('Titan')
+              <button type="button" onClick={item.action} disabled={loading} className={`h-9 px-4 rounded-xl text-[10px] font-900 uppercase tracking-widest transition-all ${item.title.startsWith('Titan')
                   ? 'bg-[#0057c7] text-white hover:bg-[#004bb1] shadow-lg shadow-[#0057c7]/20'
                   : item.connected
                     ? 'bg-white/5 text-[#38bdf8] hover:bg-[#38bdf8]/10 hover:border-[#38bdf8]/30 border border-white/10'
                     : 'bg-[#0057c7] text-white hover:bg-[#004bb1] shadow-lg shadow-[#0057c7]/20'
-              } disabled:opacity-50`}>
+                } disabled:opacity-50`}>
                 {item.connected ? 'Configure' : 'Connect / Test Driver'}
               </button>
             </div>
@@ -11616,7 +11603,7 @@ export function SettingsPage({ toast }) {
   const [activeTab, setActiveTab] = useState('Firm Profile');
   const [settings, setSettings] = useState({});
   const [companyProfile, setCompanyProfile] = useState({});
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -11758,7 +11745,7 @@ export function SettingsPage({ toast }) {
           {/* Branding Uploads */}
           <div className="space-y-6 pt-6 border-t border-white/5">
             <h4 className="text-[12px] font-900 text-white uppercase tracking-[0.2em]">Document Branding (PDFs & Templates)</h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Logo Upload */}
               <div className="p-5 border border-white/5 rounded-2xl bg-white/[0.02]">
@@ -11788,7 +11775,7 @@ export function SettingsPage({ toast }) {
       )}
 
 
-      
+
       {activeTab === 'Social Links' && <SocialLinksSettings toast={toast} />}
 
       {activeTab === 'Security' && (
@@ -11836,7 +11823,7 @@ export function SettingsPage({ toast }) {
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `firm_export_${new Date().toISOString().slice(0,10)}.json`;
+                      a.download = `firm_export_${new Date().toISOString().slice(0, 10)}.json`;
                       a.click();
                       URL.revokeObjectURL(url);
                       toast('Full firm data exported successfully! (Point 25)', 'success');
@@ -11929,16 +11916,16 @@ export function SettingsPage({ toast }) {
             </div>
             <div className="flex justify-end mt-10 pt-6 border-t border-white/5">
               <button onClick={async () => {
-                  if (!passwordForm.currentPassword || !passwordForm.newPassword) return toast('Please fill in all password fields', 'error');
-                  if (passwordForm.newPassword !== passwordForm.confirmPassword) return toast('Passwords do not match', 'error');
-                  if (passwordForm.currentPassword === passwordForm.newPassword) return toast('New password cannot be the same as the current password', 'error');
-                  try {
-                    setLoading(true);
-                    await api.auth.changePassword({ currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
-                    toast('Password updated successfully!', 'success');
-                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-                  } catch (e) { toast(e.message || 'Failed to update password', 'error'); } finally { setLoading(false); }
-                }} disabled={loading} className="h-12 px-10 rounded-2xl bg-[#0057c7] text-white text-[11px] font-900 uppercase tracking-widest hover:bg-[#004bb1] transition-all shadow-[0_10px_30px_rgba(0,87,199,0.3)] disabled:opacity-50">
+                if (!passwordForm.currentPassword || !passwordForm.newPassword) return toast('Please fill in all password fields', 'error');
+                if (passwordForm.newPassword !== passwordForm.confirmPassword) return toast('Passwords do not match', 'error');
+                if (passwordForm.currentPassword === passwordForm.newPassword) return toast('New password cannot be the same as the current password', 'error');
+                try {
+                  setLoading(true);
+                  await api.auth.changePassword({ currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
+                  toast('Password updated successfully!', 'success');
+                  setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                } catch (e) { toast(e.message || 'Failed to update password', 'error'); } finally { setLoading(false); }
+              }} disabled={loading} className="h-12 px-10 rounded-2xl bg-[#0057c7] text-white text-[11px] font-900 uppercase tracking-widest hover:bg-[#004bb1] transition-all shadow-[0_10px_30px_rgba(0,87,199,0.3)] disabled:opacity-50">
                 {loading ? 'Updating Vault...' : 'Reset Credentials'}
               </button>
             </div>
@@ -11957,7 +11944,7 @@ export function SettingsPage({ toast }) {
 // ─────────────────────────────────────────────────────────
 export function TemplateLibrary({ targetMatterId, onSelect, toast }) {
   const [templates, setTemplates] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [search, setSearch] = useState('');
@@ -12001,9 +11988,9 @@ export function TemplateLibrary({ targetMatterId, onSelect, toast }) {
 
   const handleEdit = (template) => {
     window.dispatchEvent(new CustomEvent('vktori:open-modal', {
-      detail: { 
-        type: 'edit-template', 
-        data: template, 
+      detail: {
+        type: 'edit-template',
+        data: template,
         onSave: async (values) => {
           const catVal = values.category === 'other'
             ? (values.custom_category || '').trim()
@@ -12028,9 +12015,9 @@ export function TemplateLibrary({ targetMatterId, onSelect, toast }) {
   };
 
   const filtered = templates.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) || 
-                          (t.category || '').toLowerCase().includes(search.toLowerCase()) ||
-                          (t.description || '').toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
+      (t.category || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.description || '').toLowerCase().includes(search.toLowerCase());
     const mappedTab = activeTab.toLowerCase().replace(/ /g, '_');
     const matchesTab = activeTab === 'All' || (t.category || '').toLowerCase() === mappedTab;
     return matchesSearch && matchesTab;
@@ -12060,9 +12047,9 @@ export function TemplateLibrary({ targetMatterId, onSelect, toast }) {
         <button
           onClick={() => {
             window.dispatchEvent(new CustomEvent('vktori:open-modal', {
-              detail: { 
-                type: 'add-template', 
-                data: null, 
+              detail: {
+                type: 'add-template',
+                data: null,
                 onSave: async (values) => {
                   const catVal = values.category === 'other'
                     ? (values.custom_category || '').trim()
@@ -12098,9 +12085,8 @@ export function TemplateLibrary({ targetMatterId, onSelect, toast }) {
             <button
               key={cat}
               onClick={() => setActiveTab(cat)}
-              className={`px-4 py-1.5 rounded-lg text-[11px] font-900 uppercase tracking-widest transition-colors whitespace-nowrap ${
-                activeTab === cat ? 'bg-[#38bdf8] text-white shadow-lg shadow-[#38bdf8]/20' : 'bg-white/5 text-[#8a94a6] hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-4 py-1.5 rounded-lg text-[11px] font-900 uppercase tracking-widest transition-colors whitespace-nowrap ${activeTab === cat ? 'bg-[#38bdf8] text-white shadow-lg shadow-[#38bdf8]/20' : 'bg-white/5 text-[#8a94a6] hover:text-white hover:bg-white/10'
+                }`}
             >
               {cat}
             </button>
@@ -12137,10 +12123,10 @@ export function TemplateLibrary({ targetMatterId, onSelect, toast }) {
               </button>
               {targetMatterId && (
                 <button onClick={() => {
-                    window.dispatchEvent(new CustomEvent('vktori:open-modal', {
-                      detail: { type: 'use-template', data: { ...t, targetMatterId } }
-                    }));
-                  }} className="btn btn-primary h-9 px-6 text-[11px] font-900 uppercase tracking-widest shadow-[#0057c7]/20 whitespace-nowrap">
+                  window.dispatchEvent(new CustomEvent('vktori:open-modal', {
+                    detail: { type: 'use-template', data: { ...t, targetMatterId } }
+                  }));
+                }} className="btn btn-primary h-9 px-6 text-[11px] font-900 uppercase tracking-widest shadow-[#0057c7]/20 whitespace-nowrap">
                   Apply Template
                 </button>
               )}
@@ -12167,7 +12153,7 @@ export function SocialLinksSettings({ toast }) {
     { platform: 'Facebook', url: '' },
     { platform: 'YouTube', url: '' }
   ]);
-  
+
   const [loading, setLoading] = useState(true);
   const isFirstLoad = useRef(true);
   const [saving, setSaving] = useState(false);
@@ -12219,13 +12205,13 @@ export function SocialLinksSettings({ toast }) {
         <h3 className="text-[11px] font-900 text-white uppercase tracking-[0.3em]">Institutional Presence</h3>
       </div>
       <p className="text-[13px] text-[#8a94a6] mb-10 leading-relaxed opacity-70">Configure authenticated social identity links for the firm's public portal.</p>
-      
+
       <div className="space-y-6">
         {links.map(link => (
           <div key={link.platform} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-5 bg-white/[0.02] border border-white/5 rounded-2xl group hover:border-[#38bdf8]/30 transition-all">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-xl shadow-lg group-hover:scale-110 transition-transform">
-                {link.platform === 'LinkedIn' ? <svg className="w-5 h-5 text-[#0077b5]" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg> : link.platform === 'Instagram' ? <svg className="w-5 h-5 text-[#e1306c]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg> : link.platform === 'Facebook' ? <svg className="w-5 h-5 text-[#1877f2]" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> : <svg className="w-5 h-5 text-[#ff0000]" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>}
+                {link.platform === 'LinkedIn' ? <svg className="w-5 h-5 text-[#0077b5]" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg> : link.platform === 'Instagram' ? <svg className="w-5 h-5 text-[#e1306c]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" /></svg> : link.platform === 'Facebook' ? <svg className="w-5 h-5 text-[#1877f2]" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg> : <svg className="w-5 h-5 text-[#ff0000]" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>}
               </div>
               <span className="text-[14px] font-900 text-white tracking-tight">{link.platform}</span>
             </div>

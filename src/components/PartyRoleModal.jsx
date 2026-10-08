@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { formatUSPhone } from '../utils/phoneUtils';
+import { WORLD_COUNTRIES } from '../utils/countries';
 
 const PARTY_ROLES = [
   'Client (individual)',
@@ -300,7 +301,10 @@ export default function PartyRoleModal({ isOpen, onClose, onAddParty }) {
               </div>
               <div>
                 <label className="text-[11px] font-800 uppercase tracking-wider text-[#8a94a6] mb-1.5 block">Country of Birth:</label>
-                <input type="text" name="country_of_birth" placeholder="e.g. Mexico, India" value={formData.country_of_birth} onChange={handleChange} className="w-full bg-[#0f172a] border border-white/15 rounded-xl px-3.5 py-2.5 text-white text-xs placeholder-slate-500 focus:border-[#38bdf8] outline-none" />
+                <select name="country_of_birth" value={formData.country_of_birth} onChange={handleChange} className="w-full bg-[#0f172a] border border-white/15 rounded-xl px-3.5 py-2.5 text-white text-xs placeholder-slate-500 focus:border-[#38bdf8] outline-none">
+                  <option value="">Select Country of Birth...</option>
+                  {WORLD_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
             </div>
           )}

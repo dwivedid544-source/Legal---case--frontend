@@ -255,6 +255,45 @@ function ReferralReportWidget({ refreshTick }) {
           </table>
         </div>
       </div>
+
+      {/* Outstanding Payouts Table */}
+      {data.outstanding_payouts && data.outstanding_payouts.length > 0 && (
+        <div className="pt-2 border-t border-white/5">
+          <h4 className="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span>⏳</span> Scheduled Referral Fee Payouts (CRPC 1.5.1 Compliance)
+          </h4>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-white/10 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="py-2.5 px-3">Recipient Partner</th>
+                  <th className="py-2.5 px-3">Associated Matter</th>
+                  <th className="py-2.5 px-3">Client</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3 text-right">Payout Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {data.outstanding_payouts.map((p, pIdx) => (
+                  <tr key={pIdx} className="hover:bg-white/[0.02]">
+                    <td className="py-3 px-3 font-bold text-white">{p.recipient}</td>
+                    <td className="py-3 px-3 text-slate-300">{p.matter_title} ({p.matter_number})</td>
+                    <td className="py-3 px-3 text-slate-400">{p.client_name}</td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 uppercase">
+                        Pending Payout
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono font-bold text-amber-400">
+                      ${Number(p.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

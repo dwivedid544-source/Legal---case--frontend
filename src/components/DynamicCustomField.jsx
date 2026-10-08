@@ -1,5 +1,6 @@
 import React from 'react';
 import { Field, Input, Select } from './UI.jsx';
+import { WORLD_COUNTRIES } from '../utils/countries.js';
 
 /**
  * Dynamic Metadata-Driven Custom Field Renderer
@@ -110,13 +111,9 @@ export function DynamicCustomField({ field, value, onChange, disabled }) {
             required={field.required}
           >
             <option value="">Select Country...</option>
-            <option value="United States">United States</option>
-            <option value="Mexico">Mexico</option>
-            <option value="India">India</option>
-            <option value="Canada">Canada</option>
-            <option value="United Kingdom">United Kingdom</option>
-            <option value="China">China</option>
-            <option value="Other">Other</option>
+            {WORLD_COUNTRIES.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </Select>
         </Field>
       );

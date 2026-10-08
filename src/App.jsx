@@ -50,13 +50,14 @@ const FEDERAL_COURTS = [
 
 import TitanEmailModule from './pages/EmailModule/TitanEmailModule.jsx';
 import { evaluateConditionRule, evaluateSectionRules, defaultMatterFormSections, practiceAreaConfigs, getPracticeAreaConfig, isSectionVisibleForPracticeArea, matterTypeConfigs, getMatterTypeConfig, getCombinedMatterConfig, isSectionVisibleForMatter, customFieldRegistry, getCustomFieldsForMatter, getCustomFieldsForParty, partyRoleFormConfigs, getPartyRoleFormConfig, formatUSPhone, serializeId, deserializeId } from './utils/adaptiveEngine.js';
+import { WORLD_COUNTRIES } from './utils/countries.js';
 
 // ─────────────────────────────────────────────────────────
 //  CONFIDENTIAL IDENTITY FIELDS COMPONENT
 // ─────────────────────────────────────────────────────────
 function ConfidentialIdFields({ value, onChange }) {
   const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'];
-  const COUNTRIES = ["United States", "Canada", "Mexico", "United Kingdom", "India", "Australia", "Germany", "France", "Japan", "China", "Brazil", "Argentina", "South Africa", "Egypt"];
+  const COUNTRIES = WORLD_COUNTRIES;
   
   const [fields, setFields] = useState(() => deserializeId(value));
 
@@ -2561,7 +2562,7 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
   switch (type) {
     case 'add-lead': {
       if (!uid) throw new Error('Not signed in.');
-      const full_name = `${values.firstName || ''} ${values.lastName || ''}`.trim();
+      const full_name = [values.firstName, values.middleName, values.lastName].filter(Boolean).map(s => s.trim()).join(' ');
       let practice = values.matterType || 'General';
       if (practice === 'other') {
         practice = (values.custom_matter_type || '').trim();
@@ -2590,20 +2591,22 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
         : (values.party_role || 'Client');
       const full_name = party_type === 'Organization' 
         ? values.organization_name?.trim() 
-        : `${values.firstName || ''} ${values.lastName || ''}`.trim();
+        : [values.firstName, values.middleName, values.lastName].filter(Boolean).map(s => s.trim()).join(' ');
         
       const address_line_1 = values.address_line_1 || null;
       const address_line_2 = values.address_line_2 || null;
       const city = values.city || null;
       const state = values.state || null;
       const postal_code = values.postal_code || null;
+      const country = values.country || 'United States';
       
       const computedAddress = address_line_1
-        ? `${address_line_1}${address_line_2 ? ', ' + address_line_2 : ''}, ${city || ''}, ${state || ''} ${postal_code || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '')
+        ? `${address_line_1}${address_line_2 ? ', ' + address_line_2 : ''}, ${city || ''}, ${state || ''} ${postal_code || ''}${country && country !== 'United States' ? ', ' + country : ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '')
         : null;
 
       await api.clients.create({
         full_name,
+        middle_name: values.middleName || null,
         email: values.email,
         phone: values.phone || null,
         notes: values.notes || null,
@@ -2611,6 +2614,7 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
         party_role,
         organization_name: values.organization_name || null,
         contact_first_name: values.contact_first_name || null,
+        contact_middle_name: values.contact_middle_name || null,
         contact_last_name: values.contact_last_name || null,
         business_address: party_type === 'Organization' ? computedAddress : null,
         home_address: party_type !== 'Organization' ? computedAddress : null,
@@ -2643,7 +2647,7 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
         : (values.party_role || 'Client');
       const full_name = party_type === 'Organization' 
         ? values.organization_name?.trim() 
-        : `${values.firstName || ''} ${values.lastName || ''}`.trim();
+        : [values.firstName, values.middleName, values.lastName].filter(Boolean).map(s => s.trim()).join(' ');
       const st = (values.status || 'active').toLowerCase();
       const is_portal_enabled = st === 'active';
       const address_line_1 = values.address_line_1 || null;
@@ -2651,13 +2655,16 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
       const city = values.city || null;
       const state = values.state || null;
       const postal_code = values.postal_code || null;
+      const country = values.country || 'United States';
       
       const computedAddress = address_line_1
-        ? `${address_line_1}${address_line_2 ? ', ' + address_line_2 : ''}, ${city || ''}, ${state || ''} ${postal_code || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '')
+        ? `${address_line_1}${address_line_2 ? ', ' + address_line_2 : ''}, ${city || ''}, ${state || ''} ${postal_code || ''}${country && country !== 'United States' ? ', ' + country : ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '')
         : null;
 
        await api.clients.update(id, {
         full_name,
+        middle_name: values.middleName || null,
+        contact_middle_name: values.contact_middle_name || null,
         email: values.email,
         phone: values.phone || null,
         notes: values.notes || null,
@@ -3122,7 +3129,7 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
     }
     case 'add-user': {
       if (!uid) throw new Error('Not signed in.');
-      const fullName = `${values.firstName || ''} ${values.lastName || ''}`.trim();
+      const fullName = [values.firstName, values.middleName, values.lastName].filter(Boolean).map(s => s.trim()).join(' ');
       const role = String(values.roleLabel || '').toLowerCase();
 
       if (role === 'client') {
@@ -4698,8 +4705,9 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     'add-lead': {
       title: 'Add New Lead', wide: false,
       body: <>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-3 gap-3 mb-3">
           <Field label="First Name" required><Input name="firstName" placeholder="John" required /></Field>
+          <Field label="Middle Name"><Input name="middleName" placeholder="M." /></Field>
           <Field label="Last Name" required><Input name="lastName" placeholder="Doe" required /></Field>
         </div>
         <div className="mb-3">
@@ -4776,14 +4784,16 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
         {formState.party_type === 'Organization' ? (
           <>
             <div className="mb-3"><Field label="Organization Name" required><Input name="organization_name" placeholder="Acme Corp" required /></Field></div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-3 gap-3 mb-3">
               <Field label="Contact First Name"><Input name="contact_first_name" placeholder="John" /></Field>
+              <Field label="Contact Middle Name"><Input name="contact_middle_name" placeholder="E." /></Field>
               <Field label="Contact Last Name"><Input name="contact_last_name" placeholder="Doe" /></Field>
             </div>
           </>
         ) : (
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-3 gap-3 mb-3">
             <Field label="First Name" required><Input name="firstName" placeholder="John" required /></Field>
+            <Field label="Middle Name"><Input name="middleName" placeholder="Edward" /></Field>
             <Field label="Last Name" required><Input name="lastName" placeholder="Doe" required /></Field>
           </div>
         )}
@@ -4804,17 +4814,15 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
           <Field label="Address Line 1"><Input name="address_line_1" placeholder="123 Main St" /></Field>
           <Field label="Address Line 2"><Input name="address_line_2" placeholder="Apt, Suite, Unit" /></Field>
         </div>
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-4 gap-3 mb-3">
           <Field label="City"><Input name="city" placeholder="Los Angeles" /></Field>
-          <Field label="State">
-            <Select name="state" defaultValue="">
-              <option value="">Select State</option>
-              {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+          <Field label="State / Province"><Input name="state" placeholder="CA" /></Field>
+          <Field label="Postal / ZIP Code"><Input name="postal_code" placeholder="90001" /></Field>
+          <Field label="Country">
+            <Select name="country" defaultValue="United States">
+              {WORLD_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
             </Select>
           </Field>
-          <Field label="ZIP Code"><Input name="postal_code" placeholder="90001" /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Field label="Date of Birth"><Input name="date_of_birth" type="date" /></Field>
@@ -4899,15 +4907,17 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             {(formState.party_type || data?.party_type) === 'Organization' ? (
               <>
                 <div className="mb-3"><Field label="Organization Name" required><Input name="organization_name" defaultValue={data?.organization_name || data?.full_name || ''} required /></Field></div>
-                <div className="grid grid-cols-2 gap-3 mb-3 items-end">
+                <div className="grid grid-cols-3 gap-3 mb-3 items-end">
                   <Field label="Contact First Name"><Input name="contact_first_name" defaultValue={data?.contact_first_name || ''} /></Field>
+                  <Field label="Contact Middle Name"><Input name="contact_middle_name" defaultValue={data?.contact_middle_name || ''} /></Field>
                   <Field label="Contact Last Name"><Input name="contact_last_name" defaultValue={data?.contact_last_name || ''} /></Field>
                 </div>
               </>
             ) : (
-              <div className="grid grid-cols-2 gap-3 mb-3 items-end">
-                <Field label="First Name" required><Input name="firstName" defaultValue={data?.full_name ? data.full_name.split(' ')[0] : (data?.name ? data.name.split(' ')[0] : '')} required /></Field>
-                <Field label="Last Name"><Input name="lastName" defaultValue={data?.full_name ? data.full_name.split(' ').slice(1).join(' ') : (data?.name ? data.name.split(' ').slice(1).join(' ') : '')} /></Field>
+              <div className="grid grid-cols-3 gap-3 mb-3 items-end">
+                <Field label="First Name" required><Input name="firstName" defaultValue={data?.first_name || (data?.full_name ? data.full_name.split(' ')[0] : '')} required /></Field>
+                <Field label="Middle Name"><Input name="middleName" defaultValue={data?.middle_name || (data?.full_name && data.full_name.split(' ').length > 2 ? data.full_name.split(' ').slice(1, -1).join(' ') : '')} /></Field>
+                <Field label="Last Name"><Input name="lastName" defaultValue={data?.last_name || (data?.full_name && data.full_name.split(' ').length > 1 ? data.full_name.split(' ').slice(-1).join(' ') : '')} /></Field>
               </div>
             )}
 
@@ -4933,17 +4943,15 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
               <Field label="Address Line 1"><Input name="address_line_1" defaultValue={data?.address_line_1 || ''} placeholder="123 Main St" /></Field>
               <Field label="Address Line 2"><Input name="address_line_2" defaultValue={data?.address_line_2 || ''} placeholder="Apt, Suite, Unit" /></Field>
             </div>
-            <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-4 gap-3 mb-3">
               <Field label="City"><Input name="city" defaultValue={data?.city || ''} placeholder="Los Angeles" /></Field>
-              <Field label="State">
-                <Select name="state" defaultValue={data?.state || ''}>
-                  <option value="">Select State</option>
-                  {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+              <Field label="State / Province"><Input name="state" defaultValue={data?.state || ''} placeholder="CA" /></Field>
+              <Field label="Postal / ZIP Code"><Input name="postal_code" defaultValue={data?.postal_code || ''} placeholder="90001" /></Field>
+              <Field label="Country">
+                <Select name="country" defaultValue={data?.country || 'United States'}>
+                  {WORLD_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </Select>
               </Field>
-              <Field label="ZIP Code"><Input name="postal_code" defaultValue={data?.postal_code || ''} placeholder="90001" /></Field>
             </div>
             <div className="grid grid-cols-1 gap-3 mb-3">
               <Field label="Date of Birth"><Input name="date_of_birth" type="date" defaultValue={data?.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : ''} /></Field>
@@ -7666,8 +7674,9 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     'add-user': {
       title: 'Add New User', wide: false,
       body: <>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-3 gap-3 mb-3">
           <Field label="First Name" required><Input name="firstName" placeholder="Jane" required /></Field>
+          <Field label="Middle Name"><Input name="middleName" placeholder="M." /></Field>
           <Field label="Last Name" required><Input name="lastName" placeholder="Smith" required /></Field>
         </div>
         <div className="mb-3"><Field label="Email Address" required><Input name="email" type="email" placeholder="jane@victoriatulsidaslaw.com" required /></Field></div>
