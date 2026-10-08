@@ -222,19 +222,27 @@ export function Modal({ title, onClose, children, footer, wide }) {
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  const isTitan = wide === 'titan';
+
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-      <div className={`relative bg-[#1a2233] border border-white/10 rounded-[2rem] shadow-[0_30px_100px_rgba(0,0,0,0.8)] w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} animate-slide-up max-h-[92vh] flex flex-col overflow-hidden z-10`}
+      <div className={`relative bg-[#1a2233] border border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.8)] animate-slide-up flex flex-col overflow-hidden z-10 ${
+        isTitan
+          ? 'rounded-2xl w-[580px] max-w-[95vw] max-h-[430px]'
+          : wide
+            ? 'rounded-[2rem] w-full max-w-4xl max-h-[92vh]'
+            : 'rounded-[2rem] w-full max-w-lg max-h-[92vh]'
+      }`}
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-white/[0.02]">
-          <h3 className="text-xl font-800 text-white font-display tracking-tight">{title}</h3>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl text-[#8a94a6] hover:bg-white/10 hover:text-white transition-all">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <div className={`flex items-center justify-between ${isTitan ? 'px-6 py-3.5' : 'px-8 py-6'} border-b border-white/5 bg-white/[0.02]`}>
+          <h3 className={`${isTitan ? 'text-[16px]' : 'text-xl'} font-800 text-white font-display tracking-tight truncate mr-3`}>{title}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8a94a6] hover:bg-white/10 hover:text-white transition-all shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <div className="overflow-y-auto p-8 flex-1 custom-scrollbar">{children}</div>
-        {footer && <div className="flex justify-end gap-3 px-8 py-5 border-t border-white/5 bg-black/20 flex-wrap">{footer}</div>}
+        <div className={`overflow-y-auto ${isTitan ? 'px-6 py-3.5 space-y-3' : 'p-8'} flex-1 custom-scrollbar`}>{children}</div>
+        {footer && <div className={`flex justify-end gap-3 ${isTitan ? 'px-6 py-3' : 'px-8 py-5'} border-t border-white/5 bg-black/20 flex-wrap`}>{footer}</div>}
       </div>
     </div>,
     document.body
