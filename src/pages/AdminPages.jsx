@@ -2,14 +2,14 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import SignatureCanvas from 'react-signature-canvas';
-import { Badge, StatCard, PageHeader, Card, Table, Tr, Td, Tabs, Timeline, EmptyState, ProgressBar, FileIcon, Modal, Field, Input, Select, Textarea, Avatar, SearchInput, downloadFile } from '../components/UI.jsx';
+import { Badge, StatCard, PageHeader, Card, Table, Tr, Td, Tabs, Timeline, EmptyState, ProgressBar, FileIcon, Modal, Field, Input, Select, CustomSelect, Textarea, Avatar, SearchInput, downloadFile } from '../components/UI.jsx';
 import api, { API_BASE_URL } from '../services/api';
 import PartyRoleModal from '../components/PartyRoleModal.jsx';
 import VariableModuleModal from '../components/VariableModuleModal.jsx';
 import StageTimelineBar from '../components/StageTimelineBar.jsx';
 import TitanComposeEmailModal from './EmailModule/components/TitanComposeEmailModal.jsx';
 import { formatUSPhone, deserializeId } from '../utils/adaptiveEngine.js';
-import { formatPSTDate, formatPSTTime } from '../utils/dateUtils';
+import { formatPSTDate, formatPSTTime, getPacificParts, getPacificToday, isSamePacificDay, pacificToUTC, getPacificTimezoneAbbr } from '../utils/dateUtils';
 
 function leadInitials(name) {
   if (!name) return '?';
@@ -7895,7 +7895,8 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
 // ─────────────────────────────────────────────────────────
 export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const isAdmin = role !== 'client';
-  const [viewDate, setViewDate] = useState(() => new Date());
+  const todayPacific = getPacificToday() || { year: new Date().getFullYear(), monthIdx: new Date().getMonth(), month: new Date().getMonth() + 1, day: new Date().getDate(), dateStr: new Date().toISOString().split('T')[0] };
+  const [viewDate, setViewDate] = useState(() => new Date(todayPacific.year, todayPacific.monthIdx, 1));
   const [events, setEvents] = useState([]);
   const [matterPick, setMatterPick] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -7912,7 +7913,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   // Quick Add State
   const [quickTitle, setQuickTitle] = useState('');
-  const [quickDate, setQuickDate] = useState(new Date().toISOString().split('T')[0]);
+  const [quickDate, setQuickDate] = useState(() => todayPacific.dateStr);
   const [quickMatter, setQuickMatter] = useState('');
   const [quickType, setQuickType] = useState('meeting');
   const [quickReminder, setQuickReminder] = useState('');
@@ -8004,6 +8005,29 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
     }
   }, [categories, quickType]);
 
+  const quickTypeOptions = useMemo(() => [
+    ...categories.filter(c => c.is_active).map(cat => ({
+      value: cat.name,
+      label: cat.name,
+      color: cat.color
+    })),
+    { value: 'general_event', label: 'General Event', color: '#10b981' }
+  ], [categories]);
+
+  const quickReminderOptions = useMemo(() => [
+    { value: '', label: 'No Reminder' },
+    { value: '1_hour', label: '1 Hour Before' },
+    { value: 'same_day', label: 'Same Day' },
+    { value: '1_day', label: '1 Day Before' },
+    { value: '3_days', label: '3 Days Before' },
+    { value: '7_days', label: '7 Days Before' },
+  ], []);
+
+  const quickMatterOptions = useMemo(() => [
+    { value: '', label: 'General Schedule' },
+    ...matterPick.map(c => ({ value: c.id, label: c.label }))
+  ], [matterPick]);
+
   const getEventColor = (e) => {
     if (e.type === 'invoice') return '#f59e0b';
     if (e.type === 'matter') return '#38bdf8';
@@ -8083,10 +8107,10 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
     }
     setIsAdding(true);
     try {
+      const evDateStr = quickDate || todayPacific.dateStr;
       let reminderDate = null;
       if (quickReminder) {
-        const evDateStr = quickDate || new Date().toISOString().split('T')[0];
-        const eventDate = new Date(`${evDateStr}T00:00:00`);
+        const eventUtc = pacificToUTC(evDateStr, '09:00:00');
         const offsetMap = {
           '1_hour': 60 * 60 * 1000,
           '1_day': 24 * 60 * 60 * 1000,
@@ -8094,16 +8118,17 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
           '7_days': 7 * 24 * 60 * 60 * 1000
         };
         if (quickReminder === 'same_day') {
-          reminderDate = new Date(eventDate);
-          reminderDate.setHours(9, 0, 0, 0);
+          reminderDate = eventUtc;
         } else if (offsetMap[quickReminder]) {
-          reminderDate = new Date(eventDate.getTime() - offsetMap[quickReminder]);
+          reminderDate = new Date(eventUtc.getTime() - offsetMap[quickReminder]);
         }
       }
 
       await api.calendar.create({
         title: quickTitle,
-        date: quickDate,
+        date: evDateStr,
+        time: '09:00',
+        timezone: 'America/Los_Angeles',
         matter_id: quickMatter || null,
         type: quickType,
         categories: [quickType],
@@ -8163,14 +8188,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
     }
   };
 
-  const sameDay = (d1, d2) => {
-    const a = new Date(d1);
-    const b = new Date(d2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  };
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const sameDay = (d1, d2) => isSamePacificDay(d1, d2);
 
   const filteredEvents = events.filter(e => {
     if (filterType === 'all') return true;
@@ -8179,21 +8197,23 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   const monthEventsSide = filteredEvents
     .filter((e) => {
-      const dt = new Date(e.date);
-      return dt.getFullYear() === year && dt.getMonth() === monthIdx;
+      const p = getPacificParts(e.date);
+      return p && p.year === year && p.monthIdx === monthIdx;
     })
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   const isOverdue = (date) => {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() < today.getTime();
+    const p = getPacificParts(date);
+    if (!p) return false;
+    const dateNum = p.year * 10000 + p.month * 100 + p.day;
+    const todayNum = todayPacific.year * 10000 + todayPacific.month * 100 + todayPacific.day;
+    return dateNum < todayNum;
   };
 
   const isDueToday = (date) => {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() === today.getTime();
+    const p = getPacificParts(date);
+    if (!p) return false;
+    return p.year === todayPacific.year && p.month === todayPacific.month && p.day === todayPacific.day;
   };
 
   if (loading) {
@@ -8220,7 +8240,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   return (
     <div className="animate-fade-in space-y-6 pb-12">
-      <PageHeader title="Calendar" subtitle={`${monthName} ${year} · Manage hearings, deadlines & meetings`}>
+      <PageHeader title="Calendar" subtitle={`${monthName} ${year} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`}>
         <div className="flex items-center gap-1 bg-white/[0.03] border border-white/5 p-1 rounded-xl">
           <button onClick={handlePrev} className="p-2 hover:bg-white/5 rounded-lg text-white transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M15 19l-7-7 7-7" /></svg>
@@ -8268,12 +8288,16 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
             </div>
             <div className="grid grid-cols-7 divide-x divide-y divide-white/5 border-b border-white/5">
               {days.map(({ day, other }, i) => {
-                const cellDate = new Date(year, monthIdx, day);
-                const evts = other ? [] : filteredEvents.filter(e => sameDay(e.date, cellDate));
-                const isCellToday = !other && day === today.getDate() && monthIdx === today.getMonth() && year === today.getFullYear();
+                const pad = (n) => String(n).padStart(2, '0');
+                const cellDateStr = `${year}-${pad(monthIdx + 1)}-${pad(day)}`;
+                const evts = other ? [] : filteredEvents.filter(e => {
+                  const p = getPacificParts(e.date);
+                  return p && p.year === year && p.monthIdx === monthIdx && p.day === day;
+                });
+                const isCellToday = !other && day === todayPacific.day && monthIdx === todayPacific.monthIdx && year === todayPacific.year;
 
                 return (
-                  <div key={i} onClick={() => openModal('add-event', { date: cellDate })} className={`min-h-[120px] p-2 ${other ? 'bg-black/20' : 'hover:bg-white/[0.04]'} cursor-pointer transition-all group relative overflow-hidden`}>
+                  <div key={i} onClick={() => openModal('add-event', { date: cellDateStr })} className={`min-h-[120px] p-2 ${other ? 'bg-black/20' : 'hover:bg-white/[0.04]'} cursor-pointer transition-all group relative overflow-hidden`}>
                     <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none group-hover:opacity-[0.05] transition-opacity">
                       <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z" /></svg>
                     </div>
@@ -8342,7 +8366,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                 >
                   <div className="absolute top-0 right-0 w-16 h-16 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/10" />
                   <div className="w-11 h-11 bg-white/[0.05] rounded-xl flex flex-col items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-inner border border-white/10">
-                    <span className="text-[16px] font-900 text-white tracking-tighter leading-none">{new Date(e.date).getDate()}</span>
+                    <span className="text-[16px] font-900 text-white tracking-tighter leading-none">{getPacificParts(e.date)?.day || '—'}</span>
                     <span className="text-[8px] text-[#38bdf8] font-900 uppercase mt-1 tracking-widest">{monthName.slice(0, 3)}</span>
                   </div>
                   <div className="flex-1 min-w-0 relative z-10">
@@ -8373,8 +8397,10 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
             </div>
           </Card>
 
-          <Card className="bg-gradient-to-br from-slate-900 to-[#0057c7]/20 border-white/10 shadow-2xl relative overflow-hidden group">
-            <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700" />
+          <Card className="bg-gradient-to-br from-slate-900 to-[#0057c7]/20 border-white/10 shadow-2xl relative group">
+            <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+              <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700" />
+            </div>
             <h3 className="text-[11px] font-900 uppercase tracking-[0.3em] mb-6 text-[#38bdf8]">Quick Entry Terminal</h3>
             <div className="space-y-4">
               <div className="relative group/input">
@@ -8393,57 +8419,30 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                   onChange={e => setQuickDate(e.target.value)}
                 />
               </div>
-              <div className="relative group/input">
-                <select
-                  className="w-full text-[13px] bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-[#0057c7]/20 transition-all appearance-none cursor-pointer font-600"
-                  value={quickType}
-                  onChange={e => setQuickType(e.target.value)}
-                >
-                  {categories.filter(c => c.is_active).map(cat => (
-                    <option key={cat.id} value={cat.name} className="bg-slate-900">{cat.name}</option>
-                  ))}
-                  <option value="general_event" className="bg-slate-900">General Event</option>
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a94a6]">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M19 9l-7 7-7-7" /></svg>
-                </div>
-              </div>
-              <div className="relative group/input">
-                <select
-                  className="w-full text-[13px] bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-[#0057c7]/20 transition-all appearance-none cursor-pointer font-600"
-                  value={quickReminder}
-                  onChange={e => setQuickReminder(e.target.value)}
-                >
-                  <option value="" className="bg-slate-900">No Reminder</option>
-                  <option value="1_hour" className="bg-slate-900">1 Hour Before</option>
-                  <option value="same_day" className="bg-slate-900">Same Day</option>
-                  <option value="1_day" className="bg-slate-900">1 Day Before</option>
-                  <option value="3_days" className="bg-slate-900">3 Days Before</option>
-                  <option value="7_days" className="bg-slate-900">7 Days Before</option>
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a94a6]">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M19 9l-7 7-7-7" /></svg>
-                </div>
-              </div>
+              <CustomSelect
+                value={quickType}
+                onChange={setQuickType}
+                options={quickTypeOptions}
+                placeholder="Select event type..."
+              />
+              <CustomSelect
+                value={quickReminder}
+                onChange={setQuickReminder}
+                options={quickReminderOptions}
+                placeholder="No Reminder"
+              />
               {['court_date', 'filing_deadline', 'hearing', 'trial_date'].includes(quickType) && (
                 <div className="flex items-center gap-2 px-1">
                   <input type="checkbox" id="quickTask" checked={quickCreateTask} onChange={e => setQuickCreateTask(e.target.checked)} className="w-4 h-4 rounded border-white/10 bg-black/20 text-[#38bdf8] focus:ring-[#38bdf8]/50" />
                   <label htmlFor="quickTask" className="text-[12px] font-500 text-white cursor-pointer">Auto Create Task</label>
                 </div>
               )}
-              <div className="relative group/input">
-                <select
-                  className="w-full text-[13px] bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-[#0057c7]/20 transition-all appearance-none cursor-pointer font-600"
-                  value={quickMatter}
-                  onChange={e => setQuickMatter(e.target.value)}
-                >
-                  <option value="" className="bg-slate-900">General Schedule</option>
-                  {matterPick.map((c) => <option key={c.id} value={c.id} className="bg-slate-900">{c.label}</option>)}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a94a6]">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M19 9l-7 7-7-7" /></svg>
-                </div>
-              </div>
+              <CustomSelect
+                value={quickMatter}
+                onChange={setQuickMatter}
+                options={quickMatterOptions}
+                placeholder="General Schedule"
+              />
               <button
                 onClick={handleQuickAdd}
                 disabled={isAdding}

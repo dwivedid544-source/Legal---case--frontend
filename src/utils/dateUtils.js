@@ -1,13 +1,227 @@
 /**
- * Central Date & Time formatting utility for PST (Pacific Standard Time / America/Los_Angeles).
- * Ensures all timestamps across the application strictly render in PST timezone
- * with 12-hour AM/PM format, independent of user's device/browser timezone.
+ * Centralized Calendar Timezone Utility using IANA 'America/Los_Angeles'.
+ * Strict bidirectional conversions between Pacific local time and UTC.
+ * Automatically supports PST (UTC-8) and PDT (UTC-7) Daylight Saving Time transitions.
+ * Ensures all timestamps across the application strictly render in America/Los_Angeles,
+ * independent of user's device/browser timezone.
  */
 
-const PST_TIMEZONE = 'America/Los_Angeles';
+export const PACIFIC_TIMEZONE = 'America/Los_Angeles';
+export const PST_TIMEZONE = PACIFIC_TIMEZONE;
 
 /**
- * Format a date string or Date object into PST date (e.g. "Aug 5, 2026")
+ * Get dynamic abbreviation for Pacific Time ('PDT' or 'PST')
+ */
+export function getPacificTimezoneAbbr(dateInput) {
+  try {
+    const d = dateInput ? new Date(dateInput) : new Date();
+    if (isNaN(d.getTime())) return 'PT';
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      timeZoneName: 'short'
+    });
+    const parts = formatter.formatToParts(d);
+    return parts.find(p => p.type === 'timeZoneName')?.value || 'PT';
+  } catch (err) {
+    return 'PT';
+  }
+}
+
+/**
+ * Converts a Pacific local date and time into a UTC Date object.
+ * Supports:
+ * - dateStr: 'YYYY-MM-DD' and timeStr: 'HH:mm' or 'HH:mm:ss'
+ * - dateStr: 'YYYY-MM-DDTHH:mm:ss' (local ISO string without offset)
+ * - dateStr: Date object or ISO string
+ * Uses a 2-pass convergence algorithm with Intl.DateTimeFormat('America/Los_Angeles')
+ * to guarantee mathematical precision across Daylight Saving Time boundaries (PST <-> PDT).
+ */
+export function pacificToUTC(dateStr, timeStr = null) {
+  if (!dateStr) return null;
+  try {
+    let y, m, d, hr = 0, min = 0, sec = 0;
+
+    if (dateStr instanceof Date) {
+      if (isNaN(dateStr.getTime())) return null;
+      if (timeStr) {
+        const pt = utcToPacific(dateStr);
+        return pacificToUTC(pt.dateStr, timeStr);
+      }
+      return dateStr;
+    }
+
+    const str = String(dateStr).trim();
+
+    if (str.includes('T')) {
+      const [dPart, tPart] = str.split('T');
+      const dPieces = dPart.split('-').map(Number);
+      y = dPieces[0];
+      m = dPieces[1];
+      d = dPieces[2];
+
+      const cleanTPart = (timeStr || tPart || '00:00:00').replace(/Z$/i, '').split(/[+-]/)[0];
+      const tPieces = cleanTPart.split(':').map(Number);
+      hr = tPieces[0] || 0;
+      min = tPieces[1] || 0;
+      sec = tPieces[2] || 0;
+    } else {
+      const dPieces = str.split('-').map(Number);
+      y = dPieces[0];
+      m = dPieces[1];
+      d = dPieces[2];
+
+      const tPieces = String(timeStr || '00:00:00').split(':').map(Number);
+      hr = tPieces[0] || 0;
+      min = tPieces[1] || 0;
+      sec = tPieces[2] || 0;
+    }
+
+    if (!y || !m || !d) return null;
+
+    // First pass: evaluate initial UTC guess in America/Los_Angeles
+    const utcGuess = new Date(Date.UTC(y, m - 1, d, hr, min, sec));
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hourCycle: 'h23'
+    });
+
+    const parts = formatter.formatToParts(utcGuess);
+    const p = {};
+    for (const part of parts) p[part.type] = part.value;
+    const inTzAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+    const offset = utcGuess.getTime() - inTzAsUtc;
+    const candidate = new Date(utcGuess.getTime() + offset);
+
+    // Second pass: check if candidate in America/Los_Angeles matches requested local time
+    const cParts = formatter.formatToParts(candidate);
+    const cp = {};
+    for (const part of cParts) cp[part.type] = part.value;
+    const cInTzAsUtc = Date.UTC(cp.year, cp.month - 1, cp.day, cp.hour, cp.minute, cp.second);
+    const desiredUtc = Date.UTC(y, m - 1, d, hr, min, sec);
+    const secondPassDiff = desiredUtc - cInTzAsUtc;
+
+    return new Date(candidate.getTime() + secondPassDiff);
+  } catch (err) {
+    return new Date();
+  }
+}
+
+/**
+ * Converts any UTC Date, ISO string, or timestamp into Pacific local representation (America/Los_Angeles).
+ * Returns complete decomposed parts and formatted strings:
+ * - year, month (1-12), monthIdx (0-11), day
+ * - hour (0-23), minute, second
+ * - dateStr: 'YYYY-MM-DD'
+ * - timeStr: 'HH:mm:ss' (24-hour)
+ * - timeStrShort: 'HH:mm'
+ * - timeStr12: 'hh:mm A' (12-hour AM/PM)
+ * - isoLocal: 'YYYY-MM-DDTHH:mm:ss'
+ * - tzName: 'PDT' or 'PST' (dynamic from Intl)
+ * - offsetMinutes: -420 (PDT) or -480 (PST)
+ * - offsetString: '-07:00' or '-08:00'
+ * - isDST: boolean
+ */
+export function utcToPacific(dateInput) {
+  if (!dateInput) return null;
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+      timeZoneName: 'short'
+    });
+
+    const parts = formatter.formatToParts(d);
+    const p = {};
+    for (const part of parts) p[part.type] = part.value;
+
+    const year = parseInt(p.year, 10);
+    const month = parseInt(p.month, 10);
+    const monthIdx = month - 1;
+    const day = parseInt(p.day, 10);
+    const hour = parseInt(p.hour, 10);
+    const minute = parseInt(p.minute, 10);
+    const second = parseInt(p.second, 10);
+    const pad = (n) => String(n).padStart(2, '0');
+
+    // 12-hour format calculation
+    const hour12Num = hour % 12 || 12;
+    const ampm = hour < 12 ? 'AM' : 'PM';
+    const timeStr12 = `${pad(hour12Num)}:${pad(minute)} ${ampm}`;
+
+    // Calculate exact offset in minutes and offset string for this specific timestamp
+    const inTzUtc = Date.UTC(year, monthIdx, day, hour, minute, second);
+    const offsetMinutes = Math.round((inTzUtc - d.getTime()) / 60000);
+    const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+    const absOffset = Math.abs(offsetMinutes);
+    const offsetHours = Math.floor(absOffset / 60);
+    const offsetMins = absOffset % 60;
+    const offsetString = `${offsetSign}${pad(offsetHours)}:${pad(offsetMins)}`;
+    const isDST = p.timeZoneName === 'PDT';
+
+    return {
+      year,
+      month,
+      monthIdx,
+      day,
+      hour,
+      minute,
+      second,
+      dateStr: `${p.year}-${p.month}-${p.day}`,
+      timeStr: `${p.hour}:${p.minute}:${p.second}`,
+      timeStrShort: `${p.hour}:${p.minute}`,
+      timeStr12,
+      isoLocal: `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`,
+      tzName: p.timeZoneName || (isDST ? 'PDT' : 'PST'),
+      offsetMinutes,
+      offsetString,
+      isDST
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Backward-compatible alias for utcToPacific
+ */
+export function getPacificParts(dateInput) {
+  return utcToPacific(dateInput);
+}
+
+/**
+ * Get current date and time parts in Pacific Time (America/Los_Angeles).
+ */
+export function getPacificToday() {
+  return utcToPacific(new Date());
+}
+
+/**
+ * Checks if two dates/timestamps fall on the same calendar day in America/Los_Angeles.
+ */
+export function isSamePacificDay(d1, d2) {
+  const p1 = utcToPacific(d1);
+  const p2 = utcToPacific(d2);
+  if (!p1 || !p2) return false;
+  return p1.year === p2.year && p1.month === p2.month && p1.day === p2.day;
+}
+
+/**
+ * Format a date string or Date object into PST/PDT date (e.g. "Oct 8, 2026")
  */
 export function formatPSTDate(dateInput, options = {}) {
   if (!dateInput) return '—';
@@ -15,7 +229,7 @@ export function formatPSTDate(dateInput, options = {}) {
     const d = new Date(dateInput);
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-US', {
-      timeZone: PST_TIMEZONE,
+      timeZone: PACIFIC_TIMEZONE,
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -27,7 +241,7 @@ export function formatPSTDate(dateInput, options = {}) {
 }
 
 /**
- * Format a date string or Date object into PST time with 12-hour AM/PM format (e.g. "02:30 PM")
+ * Format a date string or Date object into PST/PDT time with 12-hour AM/PM format (e.g. "02:30 PM")
  */
 export function formatPSTTime(dateInput, options = {}) {
   if (!dateInput) return '';
@@ -35,7 +249,7 @@ export function formatPSTTime(dateInput, options = {}) {
     const d = new Date(dateInput);
     if (isNaN(d.getTime())) return '';
     return d.toLocaleTimeString('en-US', {
-      timeZone: PST_TIMEZONE,
+      timeZone: PACIFIC_TIMEZONE,
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
@@ -47,7 +261,7 @@ export function formatPSTTime(dateInput, options = {}) {
 }
 
 /**
- * Format a date string or Date object into PST date and time combined (e.g. "Aug 5, 2026 02:30 PM PST")
+ * Format a date string or Date object into PST/PDT date and time combined (e.g. "Oct 8, 2026 02:30 PM PDT")
  */
 export function formatPSTDateTime(dateInput, includeTimezoneSuffix = false) {
   if (!dateInput) return '—';
@@ -57,8 +271,197 @@ export function formatPSTDateTime(dateInput, includeTimezoneSuffix = false) {
     const dateStr = formatPSTDate(d);
     const timeStr = formatPSTTime(d);
     if (!timeStr) return dateStr;
-    return `${dateStr} ${timeStr}${includeTimezoneSuffix ? ' PST' : ''}`;
+    const suffix = includeTimezoneSuffix ? ` ${getPacificTimezoneAbbr(d)}` : '';
+    return `${dateStr} ${timeStr}${suffix}`;
   } catch (err) {
     return '—';
   }
+}
+
+/**
+ * Parses CalDAV DTSTART / DTEND lines and values from Titan / RFC 5545 iCalendar.
+ */
+export function parseCalDavDate(rawInput, defaultTz = PACIFIC_TIMEZONE) {
+  if (!rawInput) return null;
+  if (rawInput instanceof Date) return isNaN(rawInput.getTime()) ? null : rawInput;
+
+  let str = String(rawInput).trim();
+  let tzid = null;
+
+  if (str.includes(':')) {
+    const colonIdx = str.indexOf(':');
+    const paramPart = str.slice(0, colonIdx);
+    const valuePart = str.slice(colonIdx + 1).trim();
+
+    const tzidMatch = paramPart.match(/TZID=["']?([^"';]+)["']?/i);
+    if (tzidMatch) {
+      tzid = tzidMatch[1].trim();
+    }
+    str = valuePart;
+  }
+
+  // 1. Explicit UTC ending in Z
+  if (/^\d{8}T\d{6}Z$/i.test(str)) {
+    const y = parseInt(str.slice(0, 4), 10);
+    const m = parseInt(str.slice(4, 6), 10);
+    const d = parseInt(str.slice(6, 8), 10);
+    const h = parseInt(str.slice(9, 11), 10);
+    const min = parseInt(str.slice(11, 13), 10);
+    const s = parseInt(str.slice(13, 15), 10);
+    return new Date(Date.UTC(y, m - 1, d, h, min, s));
+  }
+  if (/Z$/i.test(str)) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 2. All-day date (YYYYMMDD or YYYY-MM-DD) -> 00:00:00 in America/Los_Angeles
+  if (/^\d{8}$/.test(str)) {
+    const y = str.slice(0, 4);
+    const m = str.slice(4, 6);
+    const d = str.slice(6, 8);
+    return pacificToUTC(`${y}-${m}-${d}`, '00:00:00');
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return pacificToUTC(str, '00:00:00');
+  }
+
+  // 3. Compact local datetime: YYYYMMDDTHHMMSS
+  const compactMatch = str.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
+  if (compactMatch) {
+    const [, y, m, d, h, min, s] = compactMatch;
+    return pacificToUTC(`${y}-${m}-${d}`, `${h}:${min}:${s}`);
+  }
+
+  // 4. ISO local datetime: YYYY-MM-DDTHH:mm(:ss)?
+  const isoLocalMatch = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}(?::\d{2})?)/);
+  if (isoLocalMatch) {
+    const [, datePart, timePart] = isoLocalMatch;
+    return pacificToUTC(datePart, timePart);
+  }
+
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Central parser for calendar event creation and updates in Legal Case Management frontend.
+ */
+export function parseCalendarEventDate(dateInput, timeInput = null, defaultTime = '00:00:00') {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) return null;
+    if (timeInput) {
+      const pt = utcToPacific(dateInput);
+      return pacificToUTC(pt.dateStr, timeInput);
+    }
+    return dateInput;
+  }
+
+  const str = String(dateInput).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return pacificToUTC(str, timeInput || defaultTime);
+  }
+
+  if (/^\d{8}$/.test(str)) {
+    const y = str.slice(0, 4);
+    const m = str.slice(4, 6);
+    const d = str.slice(6, 8);
+    return pacificToUTC(`${y}-${m}-${d}`, timeInput || defaultTime);
+  }
+
+  if (str.includes('T')) {
+    if (/Z$/i.test(str)) {
+      if (timeInput) {
+        const pt = utcToPacific(str);
+        return pacificToUTC(pt.dateStr, timeInput);
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    if (/[+-]\d{2}:\d{2}$/.test(str)) {
+      if (timeInput) {
+        const pt = utcToPacific(str);
+        return pacificToUTC(pt.dateStr, timeInput);
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const [dPart, tPart] = str.split('T');
+    return pacificToUTC(dPart, timeInput || tPart || defaultTime);
+  }
+
+  return pacificToUTC(str, timeInput || defaultTime);
+}
+
+/**
+ * Format a UTC date into RFC 5545 iCalendar local string in America/Los_Angeles: YYYYMMDDTHHmmss
+ */
+export function formatPacificIcs(dateInput) {
+  const p = utcToPacific(dateInput);
+  if (!p) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${p.year}${pad(p.month)}${pad(p.day)}T${pad(p.hour)}${pad(p.minute)}${pad(p.second)}`;
+}
+
+/**
+ * Automatically converts raw URLs (e.g. OneDrive, Google Drive, web links) in plain text
+ * or HTML into secure, styled clickable <a> links with target="_blank"
+ */
+export function linkifyContent(raw) {
+  if (!raw) return '';
+  const text = String(raw);
+  const urlRegex = /(https?:\/\/[^\s<>"'\)]+)/g;
+
+  const makeLink = (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-[#38bdf8] underline hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1 font-semibold break-all" onclick="event.stopPropagation()">${url} <svg class="w-3.5 h-3.5 inline ml-0.5 shrink-0 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg></a>`;
+  };
+
+  // Check if text already contains HTML tags
+  const hasHtml = /<[a-z][\s\S]*>/i.test(text);
+
+  if (!hasHtml) {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const withLinks = escaped.replace(urlRegex, (url) => makeLink(url));
+    return withLinks.replace(/\r\n|\n|\r/g, '<br />');
+  }
+
+  // If already HTML, parse using browser DOM to safely link only non-link text nodes
+  try {
+    if (typeof window !== 'undefined' && window.DOMParser) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<div>${text}</div>`, 'text/html');
+      const container = doc.body.firstChild;
+      if (container) {
+        const walker = doc.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+        const textNodes = [];
+        while (walker.nextNode()) {
+          const parent = walker.currentNode.parentElement;
+          if (parent && parent.tagName.toLowerCase() !== 'a') {
+            textNodes.push(walker.currentNode);
+          }
+        }
+        for (const node of textNodes) {
+          if (urlRegex.test(node.nodeValue)) {
+            const span = doc.createElement('span');
+            span.innerHTML = node.nodeValue
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(urlRegex, (url) => makeLink(url));
+            node.replaceWith(span);
+          }
+        }
+        return container.innerHTML;
+      }
+    }
+  } catch (e) {
+    console.error('linkify error:', e);
+  }
+
+  return text;
 }

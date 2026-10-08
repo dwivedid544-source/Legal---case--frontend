@@ -10,7 +10,7 @@ import justiceBg from './assets/lady_justice_login_bg_1777101771752.png';
 import api from './services/api';
 import OutlookEventComposer from './components/OutlookEventComposer.jsx';
 import EmailComposeModal from './components/EmailComposeModal.jsx';
-import { formatPSTDate, formatPSTTime } from './utils/dateUtils';
+import { formatPSTDate, formatPSTTime, formatPSTDateTime, linkifyContent, getPacificToday, pacificToUTC, PACIFIC_TIMEZONE } from './utils/dateUtils';
 
 // Admin Pages
 import { AdminDashboard, ClientsPage, ContactsPage, ClientDetailPage, CasesPage, CaseDetailPage, CalendarPage, DocumentsPage, BillingPage, EmailPage, AIPage, UsersPage, SettingsPage, IntegrationsPage, TemplateLibrary } from './pages/AdminPages.jsx';
@@ -3054,9 +3054,9 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
       
       let reminderDate = null;
       if (values.reminderOffset) {
-        const evDateStr = values.date || new Date().toISOString().split('T')[0];
-        const evTimeStr = values.time || '00:00';
-        const eventDate = new Date(`${evDateStr}T${evTimeStr}:00`);
+        const evDateStr = values.date || getPacificToday().dateStr;
+        const evTimeStr = values.time || '09:00';
+        const eventUtc = pacificToUTC(evDateStr, evTimeStr);
         const offsetMap = {
           '1_hour': 60 * 60 * 1000,
           '1_day': 24 * 60 * 60 * 1000,
@@ -3064,19 +3064,19 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
           '7_days': 7 * 24 * 60 * 60 * 1000
         };
         if (values.reminderOffset === 'same_day') {
-          reminderDate = new Date(eventDate);
-          reminderDate.setHours(9, 0, 0, 0); // 9 AM same day
-        } else if (offsetMap[values.reminderOffset]) {
-          reminderDate = new Date(eventDate.getTime() - offsetMap[values.reminderOffset]);
+          reminderDate = pacificToUTC(evDateStr, '09:00:00');
+        } else if (offsetMap[values.reminderOffset] && eventUtc) {
+          reminderDate = new Date(eventUtc.getTime() - offsetMap[values.reminderOffset]);
         } else if (values.reminderOffset === 'custom' && values.customReminderDate) {
           reminderDate = new Date(values.customReminderDate);
         }
       }
 
-      await api.calendar.create({
+      const eventPayload = {
         title: values.title || 'Event',
-        date: values.date || new Date().toISOString().split('T')[0],
+        date: values.date || getPacificToday().dateStr,
         time: values.time || null,
+        timezone: PACIFIC_TIMEZONE,
         matter_id: values.matterId && !String(values.matterId).startsWith('act_') ? values.matterId : null,
         activity_id: values.matterId && String(values.matterId).startsWith('act_') ? parseInt(String(values.matterId).replace('act_', ''), 10) : null,
         type: values.eventType === 'other'
@@ -3096,8 +3096,16 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
           ...(Array.isArray(values.internalAttendees) ? values.internalAttendees : [values.internalAttendees]).filter(Boolean).map(id => ({ user_id: id })),
           ...(values.externalAttendees || '').split(',').map(e => e.trim()).filter(Boolean).map(email => ({ email }))
         ]
-      });
-      toast('Event added to calendar!', 'success');
+      };
+
+      const targetId = data?.raw_id || data?.id;
+      if (targetId) {
+        await api.calendar.update(targetId, eventPayload);
+        toast('Event updated successfully!', 'success');
+      } else {
+        await api.calendar.create(eventPayload);
+        toast('Event added to calendar!', 'success');
+      }
       dispatchRefresh();
       break;
     }
@@ -7961,7 +7969,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
               <div 
                 className="text-[14px] text-[#b8c2d1] font-500 leading-relaxed custom-editor break-words whitespace-pre-wrap overflow-hidden"
                 style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                dangerouslySetInnerHTML={{ __html: data.description }}
+                dangerouslySetInnerHTML={{ __html: linkifyContent(data.description) }}
               />
             </div>
           )}
@@ -7991,7 +7999,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 relative group hover:bg-white/[0.04] transition-colors">
               <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Configured Reminder</p>
               <p className="text-[13px] font-600 text-white">
-                {data?.reminder_date ? new Date(data.reminder_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No reminder set'}
+                {data?.reminder_date ? formatPSTDateTime(data.reminder_date, true) : 'No reminder set'}
               </p>
             </div>
             {['court_date', 'filing_deadline', 'hearing', 'trial'].includes(data?.type) && (
@@ -8089,13 +8097,22 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
                   Edit Event Details
                 </button>
                 <button
+                  type="button"
                   onClick={async () => {
                     const eventId = data?.raw_id || data?.id;
-                    if (eventId) {
-                      setEventToDelete(eventId);
-                      setShowDeleteEventConfirm(true);
-                    } else {
+                    if (!eventId) {
                       toast('This event cannot be deleted.', 'info');
+                      return;
+                    }
+                    if (window.confirm('Are you sure you want to delete this event? This action is permanent and cannot be undone.')) {
+                      try {
+                        await api.calendar.remove(eventId);
+                        toast('Calendar Event deleted successfully.', 'success');
+                        onClose();
+                        window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
+                      } catch (e) {
+                        toast(e.message || 'Delete failed', 'error');
+                      }
                     }
                   }}
                   className="flex-1 btn bg-red-950/20 text-red-400 hover:bg-red-900/30 border border-red-500/10 justify-center h-12 text-[11px] font-900 uppercase tracking-widest active:scale-[0.98] transition-transform"
@@ -9542,8 +9559,8 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       })()}
 
       {/* Custom Delete Event Confirmation Modal */}
-      {showDeleteEventConfirm && (
-        <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+      {showDeleteEventConfirm && createPortal(
+        <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-[#121826] border border-white/10 rounded-3xl p-6 w-full max-w-[400px] shadow-2xl flex flex-col gap-4 text-center text-white">
             <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-2">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -9556,6 +9573,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             </p>
             <div className="flex gap-3 mt-2">
               <button
+                type="button"
                 onClick={() => {
                   setShowDeleteEventConfirm(false);
                   setEventToDelete(null);
@@ -9565,6 +9583,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={async () => {
                   if (eventToDelete) {
                     try {
@@ -9585,12 +9604,13 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Custom Module Record Delete Confirmation Modal */}
-      {deleteCustomModuleConfirm && (
-        <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+      {deleteCustomModuleConfirm && createPortal(
+        <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-[#121826] border border-white/10 rounded-3xl p-6 w-full max-w-[400px] shadow-2xl flex flex-col gap-4 text-center text-white">
             <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-2">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -9603,12 +9623,14 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             </p>
             <div className="flex gap-3 mt-2">
               <button
+                type="button"
                 onClick={() => setDeleteCustomModuleConfirm(null)}
                 className="flex-1 py-2.5 border border-white/10 hover:bg-white/5 rounded-xl text-[12px] font-bold text-white/80 transition-all active:scale-95"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const { moduleKey, recordId } = deleteCustomModuleConfirm;
                   setCustomModuleRecords(prev => ({
@@ -9624,7 +9646,8 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -9788,10 +9811,9 @@ function AppLayout({ role, user, onLogout, onSwitchRole, toast, modal, setModal,
         onClose={() => { setOutlookComposerOpen(false); setOutlookComposerData(null); }}
         onSave={() => {
           if (outlookComposerOnSave) {
-            outlookComposerOnSave();
-          } else {
-            window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
+            try { outlookComposerOnSave(); } catch (e) { console.error(e); }
           }
+          window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
         }}
         toast={toast}
         lookups={modalLookups}

@@ -287,12 +287,193 @@ export function Select({ children, className = '', value, ...props }) {
   const normalizedValue = value !== undefined ? (value ?? '') : undefined;
   return (
     <select 
-      className={`form-input cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22%238a94a6%22%20stroke-width%3D%222.5%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%20%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25em_1.25em] bg-[right_1rem_center] bg-no-repeat ${className}`} 
+      className={`form-input cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22%238a94a6%22%20stroke-width%3D%222.5%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%20%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25em_1.25em] bg-[right_1rem_center] bg-no-repeat [color-scheme:dark] ${className}`} 
       value={normalizedValue}
       {...props}
     >
       {children}
     </select>
+  );
+}
+
+export function CustomSelect({
+  value,
+  onChange,
+  options = [],
+  placeholder = 'Select option...',
+  className = '',
+  disabled = false,
+  searchable = undefined,
+  dropUp: explicitDropUp = undefined
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dropUp, setDropUp] = useState(false);
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const normalizedOptions = options.map(opt => {
+    if (opt === null || opt === undefined) {
+      return { value: '', label: '' };
+    }
+    if (typeof opt === 'string' || typeof opt === 'number') {
+      return { value: opt, label: String(opt) };
+    }
+    return {
+      value: opt.value !== undefined ? opt.value : opt.id,
+      label: opt.label !== undefined ? opt.label : (opt.name || String(opt.value)),
+      color: opt.color,
+      icon: opt.icon
+    };
+  });
+
+  const selectedOption = normalizedOptions.find(opt => String(opt.value ?? '') === String(value ?? ''));
+
+  const isSearchable = searchable !== undefined ? searchable : normalizedOptions.length > 8;
+
+  const filteredOptions = isSearchable && searchTerm.trim()
+    ? normalizedOptions.filter(opt =>
+        String(opt.label).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(opt.value).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : normalizedOptions;
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!isOpen) {
+      if (explicitDropUp !== undefined) {
+        setDropUp(explicitDropUp);
+      } else if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setDropUp(spaceBelow < 260 && rect.top > 260);
+      }
+      setSearchTerm('');
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && isSearchable && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen, isSearchable]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={toggleOpen}
+        className={`w-full text-[13px] bg-white/[0.05] border ${
+          isOpen ? 'border-[#38bdf8] ring-4 ring-[#0057c7]/20' : 'border-white/10 hover:border-white/20'
+        } rounded-xl px-4 py-3 text-white outline-none transition-all cursor-pointer font-600 flex items-center justify-between text-left disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        <div className="flex items-center gap-2.5 truncate pr-2">
+          {selectedOption?.color && (
+            <span
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]"
+              style={{ backgroundColor: selectedOption.color, color: selectedOption.color }}
+            />
+          )}
+          <span className={`truncate ${selectedOption ? 'text-white' : 'text-white/40'}`}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
+        <div className={`text-[#8a94a6] transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180 text-[#38bdf8]' : ''}`}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute left-0 right-0 z-[70] ${
+            dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          } bg-[#0c1322] border border-white/15 rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl p-1.5 max-h-64 flex flex-col animate-fade-in`}
+          style={{ minWidth: '100%' }}
+        >
+          {isSearchable && (
+            <div className="p-1 pb-1.5 border-b border-white/10 mb-1">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search..."
+                className="w-full text-[12px] bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-white placeholder:text-white/30 outline-none focus:border-[#38bdf8] transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+
+          <div className="overflow-y-auto max-h-52 custom-scrollbar space-y-0.5">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-3 text-center text-[12px] text-[#8a94a6] italic">
+                {searchTerm ? 'No matches found' : 'No options available'}
+              </div>
+            ) : (
+              filteredOptions.map((opt, idx) => {
+                const isSelected = String(opt.value ?? '') === String(value ?? '');
+                return (
+                  <button
+                    key={`${opt.value}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 text-[13px] font-600 rounded-lg transition-all flex items-center justify-between cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0057c7] text-white shadow-md font-bold'
+                        : 'text-white/80 hover:bg-white/[0.08] hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate pr-2">
+                      {opt.color && (
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_6px_currentColor]"
+                          style={{ backgroundColor: opt.color, color: opt.color }}
+                        />
+                      )}
+                      <span className="truncate">{opt.label}</span>
+                    </div>
+                    {isSelected && (
+                      <svg className="w-4 h-4 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import api, { API_BASE_URL } from '../services/api';
+import { getPacificParts, getPacificToday, pacificToUTC, PACIFIC_TIMEZONE, getPacificTimezoneAbbr } from '../utils/dateUtils';
 
 export default function OutlookEventComposer({ isOpen, eventData, onClose, onSave, toast, lookups = {} }) {
   // Outlook State variables
+  const todayPacific = getPacificToday() || { dateStr: new Date().toISOString().split('T')[0] };
   const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [startTime, setStartTime] = useState('08:00');
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [endTime, setEndTime] = useState('08:30');
+  const [startDate, setStartDate] = useState(() => todayPacific.dateStr);
+  const [startTime, setStartTime] = useState('09:00');
+  const [endDate, setEndDate] = useState(() => todayPacific.dateStr);
+  const [endTime, setEndTime] = useState('09:30');
   const [isAllDay, setIsAllDay] = useState(false);
-  const [timezone, setTimezone] = useState('UTC');
+  const [timezone, setTimezone] = useState(PACIFIC_TIMEZONE);
   const [busyStatus, setBusyStatus] = useState('busy');
   const [importance, setImportance] = useState('normal'); // low, normal, high
   const [location, setLocation] = useState('');
@@ -310,31 +312,64 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
   useEffect(() => {
     if (eventData) {
       setTitle(eventData.title || '');
-      const evDate = eventData.date ? new Date(eventData.date) : new Date();
-      setStartDate(evDate.toISOString().split('T')[0]);
-      
-      const hours = String(evDate.getHours()).padStart(2, '0');
-      const minutes = String(evDate.getMinutes()).padStart(2, '0');
-      setStartTime(`${hours}:${minutes}`);
+      const hasId = Boolean(eventData.raw_id || eventData.id);
 
-      if (eventData.end_date) {
-        const endEvDate = new Date(eventData.end_date);
-        setEndDate(endEvDate.toISOString().split('T')[0]);
-        const endHours = String(endEvDate.getHours()).padStart(2, '0');
-        const endMinutes = String(endEvDate.getMinutes()).padStart(2, '0');
-        setEndTime(`${endHours}:${endMinutes}`);
-      }
+      if (hasId) {
+        const pt = getPacificParts(eventData.date);
+        if (pt) {
+          setStartDate(pt.dateStr);
+          setStartTime(pt.timeStr);
+        } else if (typeof eventData.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(eventData.date)) {
+          setStartDate(eventData.date);
+          setStartTime(eventData.time || '09:00');
+        } else {
+          const tPt = getPacificToday();
+          setStartDate(tPt.dateStr);
+          setStartTime('09:00');
+        }
 
-      setIsAllDay(eventData.is_all_day || false);
-      setTimezone(eventData.timezone || 'UTC');
-      setBusyStatus(eventData.busy_status || 'busy');
-      setImportance(eventData.importance || 'normal');
-      setLocation(eventData.location || '');
-      setEventType(eventData.type || 'meeting');
-      setMatterId(eventData.matter_id || '');
-      setReminderOffset(eventData.reminder_date ? 'custom' : '');
-      if (eventData.reminder_date) {
-        setCustomReminder(new Date(eventData.reminder_date).toISOString().slice(0, 16));
+        if (eventData.end_date) {
+          const endPt = getPacificParts(eventData.end_date);
+          if (endPt) {
+            setEndDate(endPt.dateStr);
+            setEndTime(endPt.timeStr);
+          }
+        } else {
+          const curPt = getPacificParts(eventData.date);
+          setEndDate(curPt ? curPt.dateStr : getPacificToday().dateStr);
+          setEndTime('10:00');
+        }
+
+        setIsAllDay(eventData.is_all_day || false);
+        setTimezone(PACIFIC_TIMEZONE);
+        setBusyStatus(eventData.busy_status || 'busy');
+        setImportance(eventData.importance || 'normal');
+        setLocation(eventData.location || '');
+        setEventType(eventData.type || 'meeting');
+        setMatterId(eventData.matter_id || '');
+        setReminderOffset(eventData.reminder_date ? 'custom' : '');
+        if (eventData.reminder_date) {
+          const remPt = getPacificParts(eventData.reminder_date);
+          setCustomReminder(remPt ? `${remPt.dateStr}T${remPt.timeStr}` : new Date(eventData.reminder_date).toISOString().slice(0, 16));
+        }
+      } else {
+        // New event opened with cell click or quick entry
+        const cellDate = typeof eventData.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(eventData.date)
+          ? eventData.date
+          : (eventData.date ? getPacificParts(eventData.date)?.dateStr : getPacificToday().dateStr);
+        setStartDate(cellDate || getPacificToday().dateStr);
+        setEndDate(cellDate || getPacificToday().dateStr);
+        setStartTime(eventData.time || '09:00');
+        setEndTime('09:30');
+        setIsAllDay(false);
+        setTimezone(PACIFIC_TIMEZONE);
+        setBusyStatus('busy');
+        setImportance('normal');
+        setLocation('');
+        setEventType(eventData.type || 'meeting');
+        setMatterId(eventData.matter_id || eventData.matterId || '');
+        setReminderOffset('15_min');
+        setCustomReminder('');
       }
 
       // Attendees
@@ -433,12 +468,13 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
     } else {
       // Clear all
       setTitle('');
-      setStartDate(new Date().toISOString().split('T')[0]);
-      setStartTime('08:00');
-      setEndDate(new Date().toISOString().split('T')[0]);
-      setEndTime('08:30');
+      const tPt = getPacificToday();
+      setStartDate(tPt.dateStr);
+      setStartTime('09:00');
+      setEndDate(tPt.dateStr);
+      setEndTime('09:30');
       setIsAllDay(false);
-      setTimezone('UTC');
+      setTimezone(PACIFIC_TIMEZONE);
       setBusyStatus('busy');
       setImportance('normal');
       setLocation('');
@@ -797,20 +833,19 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
       return;
     }
 
-    const startDateTime = new Date(`${startDate}T${startTime}:00`);
-    let endDateTime = null;
+    const startUtc = pacificToUTC(startDate, isAllDay ? '00:00:00' : startTime);
+    let endUtc = null;
     if (isAllDay) {
-      startDateTime.setHours(0, 0, 0, 0);
-      endDateTime = new Date(startDateTime);
-      endDateTime.setHours(23, 59, 59, 999);
+      endUtc = pacificToUTC(endDate || startDate, '23:59:59');
     } else {
-      endDateTime = new Date(`${endDate}T${endTime}:00`);
+      endUtc = pacificToUTC(endDate || startDate, endTime || startTime);
     }
 
     // Reminders
     let reminderDate = null;
     if (reminderOffset === 'custom' && customReminder) {
-      reminderDate = new Date(customReminder);
+      const [rDate, rTime] = customReminder.split('T');
+      reminderDate = pacificToUTC(rDate, rTime || '00:00:00');
     } else if (reminderOffset && reminderOffset !== 'none') {
       const offsetMap = {
         '5_min': 5 * 60 * 1000,
@@ -820,8 +855,8 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
         '1_hour': 60 * 60 * 1000,
         '1_day': 24 * 60 * 60 * 1000
       };
-      if (offsetMap[reminderOffset]) {
-        reminderDate = new Date(startDateTime.getTime() - offsetMap[reminderOffset]);
+      if (offsetMap[reminderOffset] && startUtc) {
+        reminderDate = new Date(startUtc.getTime() - offsetMap[reminderOffset]);
       }
     }
 
@@ -853,14 +888,14 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
       title,
       date: startDate,
       time: isAllDay ? null : startTime,
-      end_date: endDateTime.toISOString(),
+      end_date: endUtc ? endUtc.toISOString() : null,
       type: eventType,
       matter_id: matterId ? Number(matterId) : null,
       description: editorRef.current?.innerHTML || '',
       reminder_date: reminderDate ? reminderDate.toISOString() : null,
       busy_status: busyStatus,
       is_all_day: isAllDay,
-      timezone,
+      timezone: PACIFIC_TIMEZONE,
       location,
       importance,
       categories: selectedCategories,
@@ -869,15 +904,16 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
       attendees
     };
 
+    const targetId = eventData?.raw_id || eventData?.id;
     try {
-      if (eventData?.id) {
-        await api.calendar.update(eventData.id, data);
+      if (targetId) {
+        await api.calendar.update(targetId, data);
         toast('Event updated successfully', 'success');
       } else {
         await api.calendar.create(data);
         toast('Event created successfully', 'success');
       }
-      onSave();
+      if (onSave) onSave();
       onClose();
     } catch (e) {
       toast(e.message || 'Failed to save event', 'error');
@@ -886,12 +922,13 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
 
   // Delete event
   const handleDelete = async () => {
-    if (!eventData?.id) return;
-    if (window.confirm('Are you sure you want to delete this event?')) {
+    const targetId = eventData?.raw_id || eventData?.id;
+    if (!targetId) return;
+    if (window.confirm('Are you sure you want to delete this event? This action is permanent and cannot be undone.')) {
       try {
-        await api.calendar.remove(eventData.id);
+        await api.calendar.remove(targetId);
         toast('Event deleted successfully', 'success');
-        onSave();
+        if (onSave) onSave();
         onClose();
       } catch (e) {
         toast(e.message || 'Failed to delete event', 'error');
@@ -1030,7 +1067,7 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
           </button>
 
           {/* Delete Action (if editing) */}
-          {eventData?.id && (
+          {(eventData?.id || eventData?.raw_id) && (
             <button 
               onClick={handleDelete}
               className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-red-500/10 text-red-400 rounded-lg text-[13px] font-semibold transition-all active:scale-95 border border-red-500/20 flex-shrink-0"
@@ -1224,13 +1261,12 @@ export default function OutlookEventComposer({ isOpen, eventData, onClose, onSav
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <label className="text-[11px] text-white/40 font-bold uppercase flex-shrink-0">Timezone</label>
                       <select value={timezone} onChange={e => setTimezone(e.target.value)} className="border border-white/10 rounded-lg px-2.5 py-1 text-[13px] bg-[#0b101d] text-white outline-none w-full sm:w-auto">
+                        <option value="America/Los_Angeles">Pacific Time (PT · America/Los_Angeles)</option>
                         <option value="UTC">UTC (Universal Coordinated Time)</option>
-                        <option value="Asia/Kolkata">IST (Indian Standard Time)</option>
-                        <option value="America/New_York">EST (Eastern Standard Time)</option>
-                        <option value="America/Chicago">CST (Central Standard Time)</option>
-                        <option value="America/Denver">MST (Mountain Standard Time)</option>
-                        <option value="America/Los_Angeles">PST (Pacific Standard Time)</option>
-                        <option value="Europe/London">GMT (Greenwich Mean Time)</option>
+                        <option value="America/New_York">EST/EDT (Eastern Time)</option>
+                        <option value="America/Chicago">CST/CDT (Central Time)</option>
+                        <option value="America/Denver">MST/MDT (Mountain Time)</option>
+                        <option value="Europe/London">GMT/BST (London)</option>
                       </select>
                     </div>
 

@@ -5,6 +5,7 @@
 @import "tailwindcss/utilities";
 
 :root {
+  color-scheme: dark;
   --sidebar-bg: #00163c;
   --sidebar-active: #003e9e;
   --navbar-bg: #0057c7;
@@ -28,6 +29,7 @@
   html {
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
+    color-scheme: dark;
   }
 
   body {
@@ -36,6 +38,13 @@
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
+    color-scheme: dark;
+  }
+
+  select, option, optgroup {
+    color-scheme: dark;
+    background-color: #121929;
+    color: #ffffff;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -221,9 +230,12 @@
     box-shadow: 0 0 0 4px rgba(0, 87, 199, 0.15);
   }
 
-  select.form-input option {
-    background-color: #1a2233;
+  select.form-input option,
+  select option,
+  select optgroup {
+    background-color: #121929;
     color: #ffffff;
+    color-scheme: dark;
   }
 
   /* Stat Card Specific */
@@ -343,3 +355,15 @@
   margin-bottom: 0.75rem !important;
   display: block !important;
 }
+
+.custom-editor a, .email-html-content a, .communication-html-body a {
+  color: #38bdf8 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  word-break: break-all !important;
+}
+.custom-editor a:hover, .email-html-content a:hover, .communication-html-body a:hover {
+  color: #ffffff !important;
+}
