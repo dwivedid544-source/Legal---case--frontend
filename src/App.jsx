@@ -3644,19 +3644,19 @@ function ViewEventModalBody({ data }) {
         </svg>
         <div className="flex-1 min-w-0">
           <p className="text-[14px] font-semibold text-white leading-tight">
-            {formatPSTDate(data?.date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+            {formatPSTDate(data?.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
           <p className="text-[12.5px] font-medium text-[#8a94a6] mt-0.5">
             {data?.is_all_day ? 'All Day' : (() => {
-              const st = formatPSTTime(data?.date);
-              const et = data?.end_date ? formatPSTTime(data?.end_date) : null;
+              const st = formatPSTTime(data?.date, { hour: 'numeric', minute: '2-digit' });
+              const et = data?.end_date ? formatPSTTime(data?.end_date, { hour: 'numeric', minute: '2-digit' }) : null;
               return et ? `${st} - ${et}` : st;
             })()}
           </p>
         </div>
       </div>
 
-      {/* 2. Guests / Attendees (Only shown if event actually has attendees) */}
+      {/* 2. Guests / Attendees (Only shown if event actually has attendees in Titan Calendar) */}
       {guests.length > 0 && (
         <div className="space-y-2">
           <div 
@@ -3730,7 +3730,36 @@ function ViewEventModalBody({ data }) {
         </div>
       )}
 
-      {/* 3. Location (if present) */}
+      {/* 3. Description / Notes (with Titan Calendar icon) */}
+      {data?.description && (
+        <div className="flex items-start gap-3">
+          <svg className="w-5 h-5 text-[#8a94a6] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <div 
+              className="text-[13px] text-[#cbd5e1] font-normal leading-relaxed whitespace-pre-wrap break-words"
+              style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+              dangerouslySetInnerHTML={{ __html: linkifyContent(data.description) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 4. Calendar info (Titan Calendar "Calendar: Event created by info") */}
+      <div className="flex items-start gap-3 pt-0.5">
+        <svg className="w-5 h-5 text-[#8a94a6] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13.5px] font-semibold text-white/90 leading-tight">Calendar</p>
+          <p className="text-[12px] text-[#8a94a6] mt-0.5">
+            Event created by info
+          </p>
+        </div>
+      </div>
+
+      {/* 5. Location (if present) */}
       {data?.location && (
         <div className="flex items-start gap-3">
           <span className="text-[15px] shrink-0 mt-0.5">📍</span>
@@ -3741,20 +3770,9 @@ function ViewEventModalBody({ data }) {
         </div>
       )}
 
-      {/* 4. Description / Notes (Single unified flow, NO inner scrollbar) */}
-      {data?.description && (
-        <div className="pt-2 border-t border-white/5">
-          <div 
-            className="text-[13px] text-[#cbd5e1] font-normal leading-relaxed whitespace-pre-wrap break-words"
-            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-            dangerouslySetInnerHTML={{ __html: linkifyContent(data.description) }}
-          />
-        </div>
-      )}
-
-      {/* 5. Matter link (if linked) */}
+      {/* 6. Matter link (if linked) */}
       {data?.matter_number && (
-        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
           <span className="text-[10px] font-900 text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/20 px-2.5 py-0.5 rounded-lg uppercase tracking-[0.15em]">
             Matter: {data.matter_number}
           </span>
