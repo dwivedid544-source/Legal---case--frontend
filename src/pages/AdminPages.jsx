@@ -8030,8 +8030,15 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   useEffect(() => {
     loadData();
+    const handleFocus = () => { loadData(); };
+    window.addEventListener('focus', handleFocus);
     window.addEventListener('vktori:entities-changed', loadData);
-    return () => window.removeEventListener('vktori:entities-changed', loadData);
+    const interval = setInterval(loadData, 20000);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('vktori:entities-changed', loadData);
+      clearInterval(interval);
+    };
   }, [loadData]);
 
   useEffect(() => {

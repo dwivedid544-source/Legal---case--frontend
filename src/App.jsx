@@ -3631,14 +3631,6 @@ function ViewEventModalBody({ data }) {
       isOrganizer: Boolean(a.isOrganizer || (a.is_optional === false && a.status === 'accepted') || (a.email && a.email.toLowerCase().includes('casemanager')))
     })).filter(g => g.email);
   }
-  if (guests.length === 0) {
-    guests = [
-      { email: 'casemanager@victoriatulsidaslaw.com', name: 'Case Manager', isOrganizer: true, status: 'accepted' },
-      { email: 'info@victoriatulsidaslaw.com', name: 'info', isOrganizer: false, status: 'needs-action' },
-      { email: 'lawclerk@victoriatulsidaslaw.com', name: 'Law Clerk VT Law', isOrganizer: false, status: 'needs-action' },
-      { email: 'vtulsidas@victoriatulsidaslaw.com', name: 'Victoria Tulsidas, Esq.', isOrganizer: false, status: 'needs-action' }
-    ];
-  }
 
   const going = guests.filter(g => g.status === 'accepted' || g.isOrganizer).length;
   const awaiting = Math.max(0, guests.length - going);
@@ -3664,77 +3656,79 @@ function ViewEventModalBody({ data }) {
         </div>
       </div>
 
-      {/* 2. Guests / Attendees (Collapsible Dropdown) */}
-      <div className="space-y-2">
-        <div 
-          onClick={() => setGuestsExpanded(prev => !prev)}
-          className="flex items-center justify-between cursor-pointer select-none group py-0.5 -mx-1 px-1 rounded-lg hover:bg-white/[0.04] transition-colors"
-          role="button"
-          tabIndex={0}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <svg className="w-5 h-5 text-[#8a94a6] shrink-0 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <div>
-              <p className="text-[14px] font-semibold text-white leading-tight">
-                {guests.length} Guests
-              </p>
-              <p className="text-[12px] font-medium text-[#8a94a6] mt-0.5">
-                {going} going{awaiting > 0 ? `, ${awaiting} awaiting response` : ''}
-              </p>
-            </div>
-          </div>
-          <button 
-            type="button" 
-            onClick={(e) => {
-              e.stopPropagation();
-              setGuestsExpanded(prev => !prev);
-            }}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#8a94a6] group-hover:text-white hover:bg-white/10 transition-colors"
-            title={guestsExpanded ? "Collapse guests" : "Expand guests"}
+      {/* 2. Guests / Attendees (Only shown if event actually has attendees) */}
+      {guests.length > 0 && (
+        <div className="space-y-2">
+          <div 
+            onClick={() => setGuestsExpanded(prev => !prev)}
+            className="flex items-center justify-between cursor-pointer select-none group py-0.5 -mx-1 px-1 rounded-lg hover:bg-white/[0.04] transition-colors"
+            role="button"
+            tabIndex={0}
           >
-            <span className="text-[11px] font-bold">
-              {guestsExpanded ? '▲' : '▼'}
-            </span>
-          </button>
-        </div>
-
-        {guestsExpanded && (
-          <div className="pl-8 space-y-1.5 animate-fade-in">
-            {guests.map((g, idx) => {
-              const initial = (g.name || g.email || 'G').charAt(0).toUpperCase();
-              const isAccepted = g.status === 'accepted' || g.isOrganizer;
-              const avatarBg = g.isOrganizer ? 'bg-[#7c3aed]' : (idx % 2 === 0 ? 'bg-[#0057c7]' : 'bg-[#0284c7]');
-
-              return (
-                <div key={idx} className="flex items-center gap-2.5 py-0.5">
-                  <div className="relative shrink-0">
-                    <div className={`w-6 h-6 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-[11px] shadow-sm`}>
-                      {initial}
-                    </div>
-                    {isAccepted && (
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border border-[#1a2233] flex items-center justify-center text-[7px] text-white font-black">
-                        ✓
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-white/90 truncate">
-                      {g.email}
-                    </p>
-                    {g.isOrganizer && (
-                      <p className="text-[11px] font-normal text-[#8a94a6] leading-none mt-0.5">
-                        Organizer
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            <div className="flex items-center gap-3 min-w-0">
+              <svg className="w-5 h-5 text-[#8a94a6] shrink-0 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <div>
+                <p className="text-[14px] font-semibold text-white leading-tight">
+                  {guests.length} Guests
+                </p>
+                <p className="text-[12px] font-medium text-[#8a94a6] mt-0.5">
+                  {going} going{awaiting > 0 ? `, ${awaiting} awaiting response` : ''}
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setGuestsExpanded(prev => !prev);
+              }}
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#8a94a6] group-hover:text-white hover:bg-white/10 transition-colors"
+              title={guestsExpanded ? "Collapse guests" : "Expand guests"}
+            >
+              <span className="text-[11px] font-bold">
+                {guestsExpanded ? '▲' : '▼'}
+              </span>
+            </button>
           </div>
-        )}
-      </div>
+
+          {guestsExpanded && (
+            <div className="pl-8 space-y-1.5 animate-fade-in">
+              {guests.map((g, idx) => {
+                const initial = (g.name || g.email || 'G').charAt(0).toUpperCase();
+                const isAccepted = g.status === 'accepted' || g.isOrganizer;
+                const avatarBg = g.isOrganizer ? 'bg-[#7c3aed]' : (idx % 2 === 0 ? 'bg-[#0057c7]' : 'bg-[#0284c7]');
+
+                return (
+                  <div key={idx} className="flex items-center gap-2.5 py-0.5">
+                    <div className="relative shrink-0">
+                      <div className={`w-6 h-6 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-[11px] shadow-sm`}>
+                        {initial}
+                      </div>
+                      {isAccepted && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border border-[#1a2233] flex items-center justify-center text-[7px] text-white font-black">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-white/90 truncate">
+                        {g.email}
+                      </p>
+                      {g.isOrganizer && (
+                        <p className="text-[11px] font-normal text-[#8a94a6] leading-none mt-0.5">
+                          Organizer
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 3. Location (if present) */}
       {data?.location && (
