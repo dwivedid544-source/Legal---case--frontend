@@ -3617,6 +3617,163 @@ const DEFAULT_CORE_MODULES = [
 ];
 
 // ─────────────────────────────────────────────────────────
+//  VIEW EVENT MODAL BODY (TITAN CALENDAR COMPACT STYLE)
+// ─────────────────────────────────────────────────────────
+function ViewEventModalBody({ data }) {
+  const [guestsExpanded, setGuestsExpanded] = useState(true);
+
+  let guests = [];
+  if (Array.isArray(data?.attendees) && data.attendees.length > 0) {
+    guests = data.attendees.map(a => ({
+      email: a.email || a.user?.email || (typeof a === 'string' ? a : ''),
+      name: a.name || a.user?.full_name || (a.email ? a.email.split('@')[0] : 'Guest'),
+      status: a.status || 'needs-action',
+      isOrganizer: Boolean(a.isOrganizer || (a.is_optional === false && a.status === 'accepted') || (a.email && a.email.toLowerCase().includes('casemanager')))
+    })).filter(g => g.email);
+  }
+  if (guests.length === 0) {
+    guests = [
+      { email: 'casemanager@victoriatulsidaslaw.com', name: 'Case Manager', isOrganizer: true, status: 'accepted' },
+      { email: 'info@victoriatulsidaslaw.com', name: 'info', isOrganizer: false, status: 'needs-action' },
+      { email: 'lawclerk@victoriatulsidaslaw.com', name: 'Law Clerk VT Law', isOrganizer: false, status: 'needs-action' },
+      { email: 'vtulsidas@victoriatulsidaslaw.com', name: 'Victoria Tulsidas, Esq.', isOrganizer: false, status: 'needs-action' }
+    ];
+  }
+
+  const going = guests.filter(g => g.status === 'accepted' || g.isOrganizer).length;
+  const awaiting = Math.max(0, guests.length - going);
+
+  return (
+    <div className="space-y-3.5">
+      {/* 1. Date & Time */}
+      <div className="flex items-start gap-3">
+        <svg className="w-5 h-5 text-[#8a94a6] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-semibold text-white leading-tight">
+            {formatPSTDate(data?.date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+          </p>
+          <p className="text-[12.5px] font-medium text-[#8a94a6] mt-0.5">
+            {data?.is_all_day ? 'All Day' : (() => {
+              const st = formatPSTTime(data?.date);
+              const et = data?.end_date ? formatPSTTime(data?.end_date) : null;
+              return et ? `${st} - ${et}` : st;
+            })()}
+          </p>
+        </div>
+      </div>
+
+      {/* 2. Guests / Attendees (Collapsible Dropdown) */}
+      <div className="space-y-2">
+        <div 
+          onClick={() => setGuestsExpanded(prev => !prev)}
+          className="flex items-center justify-between cursor-pointer select-none group py-0.5 -mx-1 px-1 rounded-lg hover:bg-white/[0.04] transition-colors"
+          role="button"
+          tabIndex={0}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <svg className="w-5 h-5 text-[#8a94a6] shrink-0 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <div>
+              <p className="text-[14px] font-semibold text-white leading-tight">
+                {guests.length} Guests
+              </p>
+              <p className="text-[12px] font-medium text-[#8a94a6] mt-0.5">
+                {going} going{awaiting > 0 ? `, ${awaiting} awaiting response` : ''}
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setGuestsExpanded(prev => !prev);
+            }}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#8a94a6] group-hover:text-white hover:bg-white/10 transition-colors"
+            title={guestsExpanded ? "Collapse guests" : "Expand guests"}
+          >
+            <span className="text-[11px] font-bold">
+              {guestsExpanded ? '▲' : '▼'}
+            </span>
+          </button>
+        </div>
+
+        {guestsExpanded && (
+          <div className="pl-8 space-y-1.5 animate-fade-in">
+            {guests.map((g, idx) => {
+              const initial = (g.name || g.email || 'G').charAt(0).toUpperCase();
+              const isAccepted = g.status === 'accepted' || g.isOrganizer;
+              const avatarBg = g.isOrganizer ? 'bg-[#7c3aed]' : (idx % 2 === 0 ? 'bg-[#0057c7]' : 'bg-[#0284c7]');
+
+              return (
+                <div key={idx} className="flex items-center gap-2.5 py-0.5">
+                  <div className="relative shrink-0">
+                    <div className={`w-6 h-6 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-[11px] shadow-sm`}>
+                      {initial}
+                    </div>
+                    {isAccepted && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border border-[#1a2233] flex items-center justify-center text-[7px] text-white font-black">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-white/90 truncate">
+                      {g.email}
+                    </p>
+                    {g.isOrganizer && (
+                      <p className="text-[11px] font-normal text-[#8a94a6] leading-none mt-0.5">
+                        Organizer
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 3. Location (if present) */}
+      {data?.location && (
+        <div className="flex items-start gap-3">
+          <span className="text-[15px] shrink-0 mt-0.5">📍</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-[0.15em] mb-0.5">Location</p>
+            <p className="text-[13px] font-medium text-white leading-relaxed">{data.location}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Description / Notes (Single unified flow, NO inner scrollbar) */}
+      {data?.description && (
+        <div className="pt-2 border-t border-white/5">
+          <div 
+            className="text-[13px] text-[#cbd5e1] font-normal leading-relaxed whitespace-pre-wrap break-words"
+            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+            dangerouslySetInnerHTML={{ __html: linkifyContent(data.description) }}
+          />
+        </div>
+      )}
+
+      {/* 5. Matter link (if linked) */}
+      {data?.matter_number && (
+        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+          <span className="text-[10px] font-900 text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/20 px-2.5 py-0.5 rounded-lg uppercase tracking-[0.15em]">
+            Matter: {data.matter_number}
+          </span>
+          {data.matter_title && (
+            <span className="text-[11px] text-[#8a94a6] font-medium tracking-tight opacity-80 truncate">— {data.matter_title}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
 //  MODAL SYSTEM
 // ─────────────────────────────────────────────────────────
 function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lookups, openModal }) {
@@ -7893,140 +8050,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     },
     'view-event': {
       title: data?.title || 'Event Details', wide: 'titan',
-      body: (
-        <div className="space-y-3.5">
-          {/* 1. Date & Time */}
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-[#8a94a6] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-semibold text-white leading-tight">
-                {formatPSTDate(data?.date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-              </p>
-              <p className="text-[12.5px] font-medium text-[#8a94a6] mt-0.5">
-                {data?.is_all_day ? 'All Day' : (() => {
-                  const st = formatPSTTime(data?.date);
-                  const et = data?.end_date ? formatPSTTime(data?.end_date) : null;
-                  return et ? `${st} - ${et}` : st;
-                })()}
-              </p>
-            </div>
-          </div>
-
-          {/* 2. Guests / Attendees */}
-          {(() => {
-            let guests = [];
-            if (Array.isArray(data?.attendees) && data.attendees.length > 0) {
-              guests = data.attendees.map(a => ({
-                email: a.email || a.user?.email || (typeof a === 'string' ? a : ''),
-                name: a.name || a.user?.full_name || (a.email ? a.email.split('@')[0] : 'Guest'),
-                status: a.status || 'needs-action',
-                isOrganizer: Boolean(a.isOrganizer || (a.is_optional === false && a.status === 'accepted') || (a.email && a.email.toLowerCase().includes('casemanager')))
-              })).filter(g => g.email);
-            }
-            if (guests.length === 0) {
-              guests = [
-                { email: 'casemanager@victoriatulsidaslaw.com', name: 'Case Manager', isOrganizer: true, status: 'accepted' },
-                { email: 'info@victoriatulsidaslaw.com', name: 'info', isOrganizer: false, status: 'needs-action' },
-                { email: 'lawclerk@victoriatulsidaslaw.com', name: 'Law Clerk VT Law', isOrganizer: false, status: 'needs-action' },
-                { email: 'vtulsidas@victoriatulsidaslaw.com', name: 'Victoria Tulsidas, Esq.', isOrganizer: false, status: 'needs-action' }
-              ];
-            }
-
-            const going = guests.filter(g => g.status === 'accepted' || g.isOrganizer).length;
-            const awaiting = Math.max(0, guests.length - going);
-
-            return (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5 text-[#8a94a6] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <div>
-                      <p className="text-[14px] font-semibold text-white leading-tight">
-                        {guests.length} Guests
-                      </p>
-                      <p className="text-[12px] font-medium text-[#8a94a6] mt-0.5">
-                        {going} going{awaiting > 0 ? `, ${awaiting} awaiting response` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[#8a94a6] text-xs">▲</span>
-                </div>
-
-                <div className="pl-8 space-y-1.5 max-h-[125px] overflow-y-auto custom-scrollbar pr-1">
-                  {guests.map((g, idx) => {
-                    const initial = (g.name || g.email || 'G').charAt(0).toUpperCase();
-                    const isAccepted = g.status === 'accepted' || g.isOrganizer;
-                    const avatarBg = g.isOrganizer ? 'bg-[#7c3aed]' : (idx % 2 === 0 ? 'bg-[#0057c7]' : 'bg-[#0284c7]');
-
-                    return (
-                      <div key={idx} className="flex items-center gap-2.5 py-0.5">
-                        <div className="relative shrink-0">
-                          <div className={`w-6 h-6 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-[11px] shadow-sm`}>
-                            {initial}
-                          </div>
-                          {isAccepted && (
-                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border border-[#1a2233] flex items-center justify-center text-[7px] text-white font-black">
-                              ✓
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-white/90 truncate">
-                            {g.email}
-                          </p>
-                          {g.isOrganizer && (
-                            <p className="text-[11px] font-normal text-[#8a94a6] leading-none mt-0.5">
-                              Organizer
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 3. Location (if present) */}
-          {data?.location && (
-            <div className="flex items-start gap-3">
-              <span className="text-[15px] shrink-0 mt-0.5">📍</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-[0.15em] mb-0.5">Location</p>
-                <p className="text-[13px] font-medium text-white leading-relaxed">{data.location}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 4. Description / Notes */}
-          {data?.description && (
-            <div className="pt-2 border-t border-white/5">
-              <div 
-                className="text-[13px] text-[#cbd5e1] font-normal leading-relaxed whitespace-pre-wrap break-words overflow-hidden max-h-[140px] overflow-y-auto custom-scrollbar pr-1"
-                style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                dangerouslySetInnerHTML={{ __html: linkifyContent(data.description) }}
-              />
-            </div>
-          )}
-
-          {/* 5. Matter link (if linked) */}
-          {data?.matter_number && (
-            <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-              <span className="text-[10px] font-900 text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/20 px-2.5 py-0.5 rounded-lg uppercase tracking-[0.15em]">
-                Matter: {data.matter_number}
-              </span>
-              {data.matter_title && (
-                <span className="text-[11px] text-[#8a94a6] font-medium tracking-tight opacity-80 truncate">— {data.matter_title}</span>
-              )}
-            </div>
-          )}
-        </div>
-      ),
+      body: <ViewEventModalBody data={data} />,
       onSave: () => { },
     },
     'add-template': {
