@@ -8314,6 +8314,10 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
         map[p.dateStr].push(e);
       }
     }
+    // Sort each day's events chronologically by start time
+    for (const d in map) {
+      map[d].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
     return map;
   }, [filteredEvents]);
 
@@ -8323,7 +8327,8 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   const sideAgendaEvents = useMemo(() => {
     if (viewMode === 'day') {
-      return eventsByDate[selectedDayStr] || [];
+      const list = [...(eventsByDate[selectedDayStr] || [])];
+      return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     if (viewMode === 'week') {
       const res = [];
@@ -8331,7 +8336,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
         const dEvts = eventsByDate[weekDays[i].dateStr];
         if (dEvts && dEvts.length > 0) res.push(...dEvts);
       }
-      return res;
+      return res.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     // month view
     const res = [];
@@ -8342,7 +8347,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
         if (dEvts && dEvts.length > 0) res.push(...dEvts);
       }
     }
-    return res;
+    return res.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [viewMode, eventsByDate, selectedDayStr, weekDays, days, year, monthIdx]);
 
   const agendaTitle = viewMode === 'day'
@@ -8838,41 +8843,83 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
         <div className="space-y-6">
           <Card className="bg-white/[0.02] border-white/5">
-            <h3 className="text-[11px] font-900 text-white uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
-              {agendaTitle}
-            </h3>
-            <div className="space-y-3">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[11px] font-900 text-white uppercase tracking-[0.25em] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_8px_#38bdf8]" />
+                {agendaTitle}
+              </h3>
+              {sideAgendaEvents.length > 0 && (
+                <span className="text-[10px] font-800 px-2.5 py-0.5 rounded-full bg-[#0057c7]/20 text-[#38bdf8] border border-[#0057c7]/30">
+                  {sideAgendaEvents.length} {sideAgendaEvents.length === 1 ? 'event' : 'events'}
+                </span>
+              )}
+            </div>
+            <div className="space-y-2.5">
               {sideAgendaEvents.length > 0 ? sideAgendaEvents.map((e, i) => {
                 const p = getPacificParts(e.date);
+                const evDateObj = p ? new Date(Date.UTC(p.year, p.monthIdx, p.day, 12, 0, 0)) : new Date();
+                const dayOfWeekShort = evDateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                const monthShort = evDateObj.toLocaleDateString('en-US', { month: 'short' });
+                const evTimeFormatted = formatPSTTime(e.date);
+                const evColor = getEventColor(e);
+                const isOver = e.event_status !== 'completed' && isOverdue(e.date);
+                const isDue = e.event_status !== 'completed' && isDueToday(e.date);
+
                 return (
                   <div
                     key={i}
                     onClick={() => openModal('view-event', e)}
-                    className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] hover:border-[#38bdf8]/30 transition-all group cursor-pointer shadow-xl relative overflow-hidden"
+                    className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-[#38bdf8]/30 transition-all group cursor-pointer shadow-lg hover:shadow-xl relative overflow-hidden"
                   >
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/10" />
-                    <div className="w-11 h-11 bg-white/[0.05] rounded-xl flex flex-col items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-inner border border-white/10">
-                      <span className="text-[16px] font-900 text-white tracking-tighter leading-none">{p?.day || '—'}</span>
-                      <span className="text-[8px] text-[#38bdf8] font-900 uppercase mt-1 tracking-widest">{viewMode === 'month' ? monthName.slice(0, 3) : formatPSTTime(e.date) || 'All Day'}</span>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/15 transition-all duration-500" />
+                    
+                    {/* Left Date Block */}
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 flex flex-col items-center justify-center flex-shrink-0 group-hover:scale-105 group-hover:border-[#38bdf8]/40 transition-all shadow-inner">
+                      <span className="text-[9px] font-900 text-[#38bdf8] uppercase tracking-wider leading-none">
+                        {viewMode === 'month' ? monthShort : dayOfWeekShort}
+                      </span>
+                      <span className="text-[17px] font-900 text-white tracking-tight leading-none mt-1">
+                        {p?.day || '—'}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0 relative z-10">
+
+                    {/* Event Info */}
+                    <div className="flex-1 min-w-0 relative z-10 space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-[14px] font-800 text-white truncate tracking-tight">{e.title}</p>
-                        {e.event_status !== 'completed' && isOverdue(e.date) && (
-                          <span className="text-[9px] font-900 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded uppercase tracking-widest">Overdue</span>
+                        <p className="text-[13px] font-700 text-white truncate tracking-tight group-hover:text-[#38bdf8] transition-colors">
+                          {e.title}
+                        </p>
+                        {isOver && (
+                          <span className="shrink-0 text-[8px] font-900 bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                            Overdue
+                          </span>
                         )}
-                        {e.event_status !== 'completed' && isDueToday(e.date) && (
-                          <span className="text-[9px] font-900 bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-widest">Due Today</span>
+                        {isDue && (
+                          <span className="shrink-0 text-[8px] font-900 bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                            Due Today
+                          </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-[#8a94a6] font-900 uppercase tracking-widest mt-0.5 opacity-60">
-                        {(e.categories && e.categories[0]) || e.type.replace('_', ' ')}
-                      </p>
+
+                      <div className="flex items-center gap-2 text-[11px] text-[#8a94a6]">
+                        <span className="flex items-center gap-1 font-700 text-white/80">
+                          <svg className="w-3 h-3 text-[#38bdf8] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {evTimeFormatted ? `${evTimeFormatted} PDT` : 'All Day'}
+                        </span>
+                        <span className="text-white/20">•</span>
+                        <span className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider truncate">
+                          {(e.categories && e.categories[0]) || (e.type ? e.type.replace('_', ' ') : 'General')}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Right indicator dot */}
                     <div 
-                      className="w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]"
-                      style={{ color: getEventColor(e), backgroundColor: getEventColor(e) }}
+                      className="w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]"
+                      style={{ color: evColor, backgroundColor: evColor }}
+                      title={e.type || 'Event'}
                     />
                   </div>
                 );
