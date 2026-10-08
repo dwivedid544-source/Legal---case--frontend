@@ -7896,7 +7896,25 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
 export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const isAdmin = role !== 'client';
   const todayPacific = getPacificToday() || { year: new Date().getFullYear(), monthIdx: new Date().getMonth(), month: new Date().getMonth() + 1, day: new Date().getDate(), dateStr: new Date().toISOString().split('T')[0] };
-  const [viewDate, setViewDate] = useState(() => new Date(todayPacific.year, todayPacific.monthIdx, 1));
+  const [viewDate, setViewDate] = useState(() => new Date(todayPacific.year, todayPacific.monthIdx, todayPacific.day || 1));
+  const [viewMode, setViewMode] = useState('month'); // 'day' | 'week' | 'month'
+  const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
+  const viewDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (viewDropdownRef.current && !viewDropdownRef.current.contains(e.target)) {
+        setIsViewDropdownOpen(false);
+      }
+    };
+    if (isViewDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isViewDropdownOpen]);
+
   const [events, setEvents] = useState([]);
   const [matterPick, setMatterPick] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -7924,6 +7942,24 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
   const [filterType, setFilterType] = useState('all');
 
   const [showArchived, setShowArchived] = useState(false);
+  const [syncingTitan, setSyncingTitan] = useState(false);
+
+  const handleSyncTitan = async () => {
+    setSyncingTitan(true);
+    try {
+      const res = await api.calendar.syncTitan();
+      if (res && res.success) {
+        toast(res.message || 'Titan Calendar synchronized successfully', 'success');
+      } else {
+        toast(res?.error || 'Titan Calendar sync finished', 'info');
+      }
+      await loadData();
+    } catch (err) {
+      toast(err.message || 'Failed to sync Titan Calendar', 'error');
+    } finally {
+      setSyncingTitan(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     if (isFirstLoad.current) { setLoading(true); isFirstLoad.current = false; }
@@ -8149,35 +8185,105 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
     }
   };
 
+  const pad = (n) => String(n).padStart(2, '0');
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 
   const year = viewDate.getFullYear();
   const monthIdx = viewDate.getMonth();
-  const monthName = viewDate.toLocaleString('default', { month: 'long' });
+  const monthName = viewDate.toLocaleString('en-US', { month: 'long' });
 
-  const days = [];
-  const daysInMonth = getDaysInMonth(year, monthIdx);
-  const firstDay = getFirstDayOfMonth(year, monthIdx);
+  // Month grid days (memoized to avoid re-calculating on dropdown toggles)
+  const days = useMemo(() => {
+    const list = [];
+    const daysInMonth = getDaysInMonth(year, monthIdx);
+    const firstDay = getFirstDayOfMonth(year, monthIdx);
 
-  // Prev month padding
-  const prevMonthDays = getDaysInMonth(year, monthIdx - 1);
-  for (let i = 0; i < firstDay; i++) {
-    days.push({ day: prevMonthDays - firstDay + i + 1, other: true });
+    // Prev month padding
+    const prevMonthDays = getDaysInMonth(year, monthIdx - 1);
+    for (let i = 0; i < firstDay; i++) {
+      list.push({ day: prevMonthDays - firstDay + i + 1, other: true });
+    }
+
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+      list.push({ day: d });
+    }
+
+    // Next month padding
+    while (list.length % 7 !== 0) {
+      list.push({ day: list.length - (firstDay + daysInMonth) + 1, other: true });
+    }
+    return list;
+  }, [year, monthIdx]);
+
+  // Week view calculation (Sunday to Saturday)
+  const currentDayOfWeek = viewDate.getDay();
+  const weekStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() - currentDayOfWeek);
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
+    const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const isToday = d.getFullYear() === todayPacific.year && d.getMonth() === todayPacific.monthIdx && d.getDate() === todayPacific.day;
+    const isSelected = d.getFullYear() === viewDate.getFullYear() && d.getMonth() === viewDate.getMonth() && d.getDate() === viewDate.getDate();
+    return {
+      date: d,
+      dayNumber: d.getDate(),
+      dayName: d.toLocaleString('en-US', { weekday: 'short' }),
+      fullDayName: d.toLocaleString('en-US', { weekday: 'long' }),
+      dateStr,
+      isToday,
+      isSelected,
+    };
+  });
+
+  // Selected day string for Day view
+  const selectedDayStr = `${viewDate.getFullYear()}-${pad(viewDate.getMonth() + 1)}-${pad(viewDate.getDate())}`;
+  const isSelectedDayToday = viewDate.getFullYear() === todayPacific.year && viewDate.getMonth() === todayPacific.monthIdx && viewDate.getDate() === todayPacific.day;
+
+  // Navigation handlers
+  const handlePrev = () => {
+    if (viewMode === 'month') {
+      setViewDate(new Date(year, monthIdx - 1, 1));
+    } else if (viewMode === 'week') {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() - 7));
+    } else if (viewMode === 'day') {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() - 1));
+    }
+  };
+
+  const handleNext = () => {
+    if (viewMode === 'month') {
+      setViewDate(new Date(year, monthIdx + 1, 1));
+    } else if (viewMode === 'week') {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() + 7));
+    } else if (viewMode === 'day') {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() + 1));
+    }
+  };
+
+  const handleToday = () => {
+    setViewDate(new Date(todayPacific.year, todayPacific.monthIdx, todayPacific.day));
+  };
+
+  // Center navigation label
+  let navLabel = `${monthName} ${year}`;
+  if (viewMode === 'week') {
+    const sMonth = weekDays[0].date.toLocaleString('en-US', { month: 'short' });
+    const eMonth = weekDays[6].date.toLocaleString('en-US', { month: 'short' });
+    if (sMonth === eMonth) {
+      navLabel = `${sMonth} ${weekDays[0].dayNumber} – ${weekDays[6].dayNumber}, ${weekDays[6].date.getFullYear()}`;
+    } else {
+      navLabel = `${sMonth} ${weekDays[0].dayNumber} – ${eMonth} ${weekDays[6].dayNumber}, ${weekDays[6].date.getFullYear()}`;
+    }
+  } else if (viewMode === 'day') {
+    navLabel = `${viewDate.toLocaleString('en-US', { weekday: 'short' })}, ${viewDate.toLocaleString('en-US', { month: 'short' })} ${viewDate.getDate()}, ${viewDate.getFullYear()}`;
   }
 
-  // Current month
-  for (let d = 1; d <= daysInMonth; d++) {
-    days.push({ day: d });
-  }
-
-  // Next month padding
-  while (days.length % 7 !== 0) {
-    days.push({ day: days.length - (firstDay + daysInMonth) + 1, other: true });
-  }
-
-  const handlePrev = () => setViewDate(new Date(year, monthIdx - 1, 1));
-  const handleNext = () => setViewDate(new Date(year, monthIdx + 1, 1));
+  const headerSubtitle = viewMode === 'month'
+    ? `${monthName} ${year} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
+    : viewMode === 'week'
+    ? `Week of ${navLabel} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
+    : `${viewDate.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`;
 
   const getTypeStyle = (type) => {
     switch (type) {
@@ -8190,17 +8296,60 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   const sameDay = (d1, d2) => isSamePacificDay(d1, d2);
 
-  const filteredEvents = events.filter(e => {
-    if (filterType === 'all') return true;
-    return e.type === filterType;
-  });
+  const filteredEvents = useMemo(() => {
+    return events.filter(e => {
+      if (filterType === 'all') return true;
+      return e.type === filterType;
+    });
+  }, [events, filterType]);
 
-  const monthEventsSide = filteredEvents
-    .filter((e) => {
+  // High-performance date lookup map: O(1) cell lookup instead of O(cells * events) loops
+  const eventsByDate = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < filteredEvents.length; i++) {
+      const e = filteredEvents[i];
       const p = getPacificParts(e.date);
-      return p && p.year === year && p.monthIdx === monthIdx;
-    })
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+      if (p && p.dateStr) {
+        if (!map[p.dateStr]) map[p.dateStr] = [];
+        map[p.dateStr].push(e);
+      }
+    }
+    return map;
+  }, [filteredEvents]);
+
+  const dayEvents = useMemo(() => {
+    return eventsByDate[selectedDayStr] || [];
+  }, [eventsByDate, selectedDayStr]);
+
+  const sideAgendaEvents = useMemo(() => {
+    if (viewMode === 'day') {
+      return eventsByDate[selectedDayStr] || [];
+    }
+    if (viewMode === 'week') {
+      const res = [];
+      for (let i = 0; i < weekDays.length; i++) {
+        const dEvts = eventsByDate[weekDays[i].dateStr];
+        if (dEvts && dEvts.length > 0) res.push(...dEvts);
+      }
+      return res;
+    }
+    // month view
+    const res = [];
+    for (let i = 0; i < days.length; i++) {
+      if (!days[i].other) {
+        const cDate = `${year}-${pad(monthIdx + 1)}-${pad(days[i].day)}`;
+        const dEvts = eventsByDate[cDate];
+        if (dEvts && dEvts.length > 0) res.push(...dEvts);
+      }
+    }
+    return res;
+  }, [viewMode, eventsByDate, selectedDayStr, weekDays, days, year, monthIdx]);
+
+  const agendaTitle = viewMode === 'day'
+    ? `Agenda: ${viewDate.toLocaleString('en-US', { month: 'short', day: 'numeric' })}`
+    : viewMode === 'week'
+    ? 'Agenda: This Week'
+    : `Agenda: ${monthName}`;
 
   const isOverdue = (date) => {
     const p = getPacificParts(date);
@@ -8240,17 +8389,88 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   return (
     <div className="animate-fade-in space-y-6 pb-12">
-      <PageHeader title="Calendar" subtitle={`${monthName} ${year} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`}>
+      <PageHeader title="Calendar" subtitle={headerSubtitle}>
+        {/* Navigation Controls: Prev, Range Label, Next */}
         <div className="flex items-center gap-1 bg-white/[0.03] border border-white/5 p-1 rounded-xl">
-          <button onClick={handlePrev} className="p-2 hover:bg-white/5 rounded-lg text-white transition-colors">
+          <button onClick={handlePrev} className="p-2 hover:bg-white/5 rounded-lg text-white transition-colors" title="Previous">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <span className="text-[13px] font-800 text-white px-4 min-w-[120px] text-center uppercase tracking-widest">{monthName} {year}</span>
-          <button onClick={handleNext} className="p-2 hover:bg-white/5 rounded-lg text-white transition-colors">
+          <span className="text-[13px] font-800 text-white px-4 min-w-[140px] text-center uppercase tracking-widest">{navLabel}</span>
+          <button onClick={handleNext} className="p-2 hover:bg-white/5 rounded-lg text-white transition-colors" title="Next">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M9 5l7 7-7 7" /></svg>
           </button>
         </div>
-        <div className="flex gap-2 mr-auto ml-4 overflow-x-auto no-scrollbar">
+
+        {/* Today quick jump (commented out per user request) */}
+        {/* <button
+          onClick={handleToday}
+          className="px-3.5 py-2 rounded-xl text-[12px] font-800 uppercase tracking-wider bg-white/[0.04] border border-white/10 text-white/90 hover:bg-white/[0.08] hover:border-white/20 hover:text-white transition-all cursor-pointer"
+        >
+          Today
+        </button> */}
+
+        {/* View mode dropdown: Day, Week, Month */}
+        <div ref={viewDropdownRef} className="relative inline-block text-left">
+          <button
+            type="button"
+            onClick={() => setIsViewDropdownOpen(prev => !prev)}
+            className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-[12px] font-800 uppercase tracking-wider transition-all cursor-pointer ${
+              isViewDropdownOpen
+                ? 'bg-[#0057c7]/20 border-2 border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]'
+                : 'bg-white/[0.04] border border-white/10 text-white/90 hover:bg-white/[0.08] hover:border-white/20 hover:text-white'
+            }`}
+          >
+            <span>{viewMode === 'day' ? 'Day' : viewMode === 'week' ? 'Week' : 'Month'}</span>
+            <svg
+              className={`w-3.5 h-3.5 text-[#8a94a6] transition-transform duration-200 ${isViewDropdownOpen ? 'rotate-180 text-[#38bdf8]' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {isViewDropdownOpen && (
+            <div
+              className="absolute left-0 mt-2 w-36 bg-[#0c1322] border border-white/15 rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl p-1 z-[80] animate-fade-in divide-y divide-white/5"
+              role="menu"
+            >
+              {[
+                { id: 'day', label: 'Day' },
+                { id: 'week', label: 'Week' },
+                { id: 'month', label: 'Month' }
+              ].map(opt => {
+                const isSelected = viewMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setViewMode(opt.id);
+                      setIsViewDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-lg text-[13px] font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0057c7]/20 text-[#38bdf8] font-bold'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                    role="menuitem"
+                  >
+                    <span>{opt.label}</span>
+                    {isSelected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Category Filters */}
+        <div className="flex gap-2 mr-auto ml-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setFilterType('all')}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-900 uppercase tracking-widest whitespace-nowrap transition-all ${filterType === 'all' ? 'bg-[#38bdf8] text-black font-extrabold' : 'bg-white/5 text-[#8a94a6] hover:bg-white/10 hover:text-white'}`}
@@ -8268,6 +8488,17 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
             </button>
           ))}
         </div>
+        <button
+          onClick={handleSyncTitan}
+          disabled={syncingTitan}
+          className="btn btn-secondary shadow-md flex items-center gap-1.5"
+          title="Synchronize real two-way Titan Calendar (CalDAV)"
+        >
+          <svg className={`w-4 h-4 ${syncingTitan ? 'animate-spin text-[#38bdf8]' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {syncingTitan ? 'Syncing...' : 'Sync Titan'}
+        </button>
         <button onClick={() => setIsManageCatsOpen(true)} className="btn btn-secondary shadow-md flex items-center gap-1.5">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           Categories
@@ -8280,115 +8511,372 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <Card className="!p-0 overflow-hidden border-white/5 bg-white/[0.02]">
-            <div className="grid grid-cols-7 border-b border-white/5 bg-white/[0.03]">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                <div key={d} className="py-4 text-center text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em]">{d}</div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 divide-x divide-y divide-white/5 border-b border-white/5">
-              {days.map(({ day, other }, i) => {
-                const pad = (n) => String(n).padStart(2, '0');
-                const cellDateStr = `${year}-${pad(monthIdx + 1)}-${pad(day)}`;
-                const evts = other ? [] : filteredEvents.filter(e => {
-                  const p = getPacificParts(e.date);
-                  return p && p.year === year && p.monthIdx === monthIdx && p.day === day;
-                });
-                const isCellToday = !other && day === todayPacific.day && monthIdx === todayPacific.monthIdx && year === todayPacific.year;
+          {/* MONTH VIEW */}
+          {viewMode === 'month' && (
+            <Card className="!p-0 overflow-hidden border-white/5 bg-white/[0.02]">
+              <div className="grid grid-cols-7 border-b border-white/5 bg-white/[0.03]">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                  <div key={d} className="py-4 text-center text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em]">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 divide-x divide-y divide-white/5 border-b border-white/5">
+                {days.map(({ day, other }, i) => {
+                  const cellDateStr = `${year}-${pad(monthIdx + 1)}-${pad(day)}`;
+                  const evts = other ? [] : (eventsByDate[cellDateStr] || []);
+                  const isCellToday = !other && day === todayPacific.day && monthIdx === todayPacific.monthIdx && year === todayPacific.year;
 
-                return (
-                  <div key={i} onClick={() => openModal('add-event', { date: cellDateStr })} className={`min-h-[120px] p-2 ${other ? 'bg-black/20' : 'hover:bg-white/[0.04]'} cursor-pointer transition-all group relative overflow-hidden`}>
-                    <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none group-hover:opacity-[0.05] transition-opacity">
-                      <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z" /></svg>
-                    </div>
-                    <div className={`w-7 h-7 flex items-center justify-center text-[12px] mb-2 rounded-xl transition-all ${isCellToday ? 'bg-gradient-to-br from-[#0057c7] to-[#38bdf8] text-white font-900 shadow-[0_4px_12px_rgba(56,189,248,0.4)]' : other ? 'text-white/10' : 'text-white/40 font-800'}`}>{day}</div>
-                    <div className="space-y-1 relative z-10">
-                      {evts.map((e, j) => {
-                        const evColor = getEventColor(e);
-                        let alertBadge = null;
-                        let customStyle = {
-                          backgroundColor: `${evColor}1A`,
-                          color: evColor,
-                          borderColor: `${evColor}33`
-                        };
-                        if (e.event_status !== 'completed') {
-                          if (isOverdue(e.date)) {
-                            customStyle = {
-                              backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                              color: '#f87171',
-                              borderColor: 'rgba(239, 68, 68, 0.4)',
-                              boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)'
-                            };
-                            alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>;
-                          } else if (isDueToday(e.date)) {
-                            customStyle = {
-                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                              color: '#fbbf24',
-                              borderColor: 'rgba(245, 158, 11, 0.4)',
-                              boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)'
-                            };
-                            alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 ml-1"></span>;
+                  return (
+                    <div key={i} onClick={() => openModal('add-event', { date: cellDateStr })} className={`min-h-[120px] p-2 ${other ? 'bg-black/20' : 'hover:bg-white/[0.04]'} cursor-pointer transition-all group relative overflow-hidden`}>
+                      <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none group-hover:opacity-[0.05] transition-opacity">
+                        <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z" /></svg>
+                      </div>
+                      <div className={`w-7 h-7 flex items-center justify-center text-[12px] mb-2 rounded-xl transition-all ${isCellToday ? 'bg-gradient-to-br from-[#0057c7] to-[#38bdf8] text-white font-900 shadow-[0_4px_12px_rgba(56,189,248,0.4)]' : other ? 'text-white/10' : 'text-white/40 font-800'}`}>{day}</div>
+                      <div className="space-y-1 relative z-10">
+                        {evts.map((e, j) => {
+                          const evColor = getEventColor(e);
+                          let alertBadge = null;
+                          let customStyle = {
+                            backgroundColor: `${evColor}1A`,
+                            color: evColor,
+                            borderColor: `${evColor}33`
+                          };
+                          if (e.event_status !== 'completed') {
+                            if (isOverdue(e.date)) {
+                              customStyle = {
+                                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                color: '#f87171',
+                                borderColor: 'rgba(239, 68, 68, 0.4)',
+                                boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)'
+                              };
+                              alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>;
+                            } else if (isDueToday(e.date)) {
+                              customStyle = {
+                                backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                color: '#fbbf24',
+                                borderColor: 'rgba(245, 158, 11, 0.4)',
+                                boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)'
+                              };
+                              alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 ml-1"></span>;
+                            }
                           }
-                        }
-                        
-                        return (
-                          <div
-                            key={j}
-                            onClick={(ev) => { ev.stopPropagation(); openModal('view-event', e); }}
-                            className="text-[10px] font-800 px-2 py-1 rounded-lg truncate border shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-between"
-                            style={customStyle}
-                          >
-                            <span className="truncate">{e.title}</span>
-                            {alertBadge}
-                          </div>
-                        );
-                      })}
+                          
+                          return (
+                            <div
+                              key={j}
+                              onClick={(ev) => { ev.stopPropagation(); openModal('view-event', e); }}
+                              className="text-[10px] font-800 px-2 py-1 rounded-lg truncate border shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-between"
+                              style={customStyle}
+                            >
+                              <span className="truncate">{e.title}</span>
+                              {alertBadge}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* WEEK VIEW */}
+          {viewMode === 'week' && (
+            <Card className="!p-0 overflow-hidden border-white/5 bg-white/[0.02]">
+              <div className="grid grid-cols-7 border-b border-white/5 bg-white/[0.03]">
+                {weekDays.map((w) => (
+                  <div
+                    key={w.dateStr}
+                    onClick={() => { setViewDate(w.date); setViewMode('day'); }}
+                    className={`py-3.5 px-2 text-center border-r border-white/5 last:border-r-0 cursor-pointer hover:bg-white/[0.04] transition-colors ${
+                      w.isToday ? 'bg-[#0057c7]/10' : ''
+                    }`}
+                    title="Click to view this Day"
+                  >
+                    <div className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em]">
+                      {w.dayName}
+                    </div>
+                    <div className="mt-1 flex items-center justify-center">
+                      <span
+                        className={`w-7 h-7 flex items-center justify-center text-[13px] rounded-xl transition-all ${
+                          w.isToday
+                            ? 'bg-gradient-to-br from-[#0057c7] to-[#38bdf8] text-white font-900 shadow-[0_4px_12px_rgba(56,189,248,0.4)]'
+                            : 'text-white/80 font-800'
+                        }`}
+                      >
+                        {w.dayNumber}
+                      </span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </Card>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 divide-x divide-white/5 min-h-[520px]">
+                {weekDays.map((w) => {
+                  const evts = eventsByDate[w.dateStr] || [];
+
+                  return (
+                    <div
+                      key={w.dateStr}
+                      onClick={() => openModal('add-event', { date: w.dateStr })}
+                      className={`p-2 flex flex-col justify-between cursor-pointer transition-all hover:bg-white/[0.03] group relative ${
+                        w.isToday ? 'bg-white/[0.01]' : ''
+                      }`}
+                    >
+                      <div className="space-y-1.5 relative z-10 flex-1">
+                        {evts.map((e, j) => {
+                          const evColor = getEventColor(e);
+                          const evTime = formatPSTTime(e.date);
+                          let alertBadge = null;
+                          let customStyle = {
+                            backgroundColor: `${evColor}1A`,
+                            color: evColor,
+                            borderColor: `${evColor}33`,
+                          };
+                          if (e.event_status !== 'completed') {
+                            if (isOverdue(e.date)) {
+                              customStyle = {
+                                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                color: '#f87171',
+                                borderColor: 'rgba(239, 68, 68, 0.4)',
+                                boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)',
+                              };
+                              alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>;
+                            } else if (isDueToday(e.date)) {
+                              customStyle = {
+                                backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                color: '#fbbf24',
+                                borderColor: 'rgba(245, 158, 11, 0.4)',
+                                boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)',
+                              };
+                              alertBadge = <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 ml-1"></span>;
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={j}
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                openModal('view-event', e);
+                              }}
+                              className="p-2 rounded-xl border text-[11px] font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-95 space-y-1"
+                              style={customStyle}
+                            >
+                              <div className="flex items-center justify-between text-[10px] font-bold opacity-80">
+                                <span>{evTime || 'All Day'}</span>
+                                {alertBadge}
+                              </div>
+                              <div className="font-bold truncate text-[11px]">{e.title}</div>
+                              {e.type && (
+                                <div className="text-[9px] uppercase tracking-wider opacity-60 font-semibold truncate">
+                                  {e.type.replace('_', ' ')}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {evts.length === 0 && (
+                          <div className="h-full flex items-center justify-center py-10 opacity-0 group-hover:opacity-60 transition-opacity text-center">
+                            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">+ Add</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-2 pt-2 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center">
+                        <span className="text-[9px] font-extrabold text-[#38bdf8] uppercase tracking-wider">+ Event</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* DAY VIEW */}
+          {viewMode === 'day' && (
+            <Card className="!p-0 overflow-hidden border-white/5 bg-white/[0.02]">
+              {/* Day Banner Header */}
+              <div className="p-6 border-b border-white/5 bg-gradient-to-r from-white/[0.04] via-white/[0.02] to-transparent flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-900 text-white tracking-tight">
+                      {viewDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </h2>
+                    {isSelectedDayToday && (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-900 uppercase tracking-widest bg-gradient-to-r from-[#0057c7] to-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.4)]">
+                        Today
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-[#8a94a6] font-semibold mt-1">
+                    {dayEvents.length} event{dayEvents.length === 1 ? '' : 's'} scheduled · Pacific Time ({getPacificTimezoneAbbr(viewDate)})
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => openModal('add-event', { date: selectedDayStr })}
+                  className="btn btn-primary text-[12px] font-bold px-4 py-2 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  Schedule for this Day
+                </button>
+              </div>
+
+              {/* Day Events List */}
+              <div className="p-6 space-y-4 min-h-[460px]">
+                {dayEvents.length > 0 ? (
+                  <div className="space-y-3">
+                    {dayEvents.map((e, idx) => {
+                      const evColor = getEventColor(e);
+                      const timeStr = formatPSTTime(e.date);
+                      const isCompleted = e.event_status === 'completed';
+                      const overdue = !isCompleted && isOverdue(e.date);
+                      const dueToday = !isCompleted && isDueToday(e.date);
+
+                      return (
+                        <div
+                          key={e.id || idx}
+                          onClick={() => openModal('view-event', e)}
+                          className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-[#38bdf8]/40 transition-all cursor-pointer group relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        >
+                          <div className="flex items-start sm:items-center gap-4">
+                            {/* Time Box */}
+                            <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                              <span className="text-[14px] font-900 text-white block tracking-tight">
+                                {timeStr || 'All Day'}
+                              </span>
+                              <span className="text-[9px] font-bold text-[#38bdf8] uppercase tracking-wider block mt-0.5">
+                                {getPacificTimezoneAbbr(e.date)}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-[16px] font-800 text-white tracking-tight group-hover:text-[#38bdf8] transition-colors">
+                                  {e.title}
+                                </h4>
+                                {overdue && (
+                                  <span className="text-[9px] font-900 bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    Overdue
+                                  </span>
+                                )}
+                                {dueToday && (
+                                  <span className="text-[9px] font-900 bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    Due Today
+                                  </span>
+                                )}
+                                {isCompleted && (
+                                  <span className="text-[9px] font-900 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    Completed
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-3 text-[11px] text-[#8a94a6] flex-wrap font-medium">
+                                <span
+                                  className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider"
+                                  style={{ backgroundColor: `${evColor}20`, color: evColor }}
+                                >
+                                  {(e.categories && e.categories[0]) || e.type?.replace('_', ' ') || 'Event'}
+                                </span>
+                                {e.matter_number && (
+                                  <span className="text-white/60 font-semibold">
+                                    Matter: #{e.matter_number}
+                                  </span>
+                                )}
+                                {e.location && (
+                                  <span className="flex items-center gap-1 text-white/50">
+                                    📍 {e.location}
+                                  </span>
+                                )}
+                              </div>
+
+                              {e.description && (
+                                <p className="text-[12px] text-[#8a94a6] line-clamp-2 mt-1">
+                                  {e.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <span className="text-[12px] font-bold text-[#38bdf8] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              View Details →
+                            </span>
+                            <div
+                              className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_currentColor]"
+                              style={{ color: evColor, backgroundColor: evColor }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-24 text-center border-2 border-dashed border-white/5 rounded-3xl bg-white/[0.01] flex flex-col items-center justify-center">
+                    <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-2xl mb-4 text-[#8a94a6]">
+                      📅
+                    </div>
+                    <h4 className="text-[15px] font-bold text-white mb-1">No Events Scheduled</h4>
+                    <p className="text-[12px] text-[#8a94a6] max-w-sm mb-6">
+                      There are no court dates, hearings, or meetings scheduled for this day in Pacific Time.
+                    </p>
+                    <button
+                      onClick={() => openModal('add-event', { date: selectedDayStr })}
+                      className="btn btn-primary text-[12px] font-bold px-6 py-2.5"
+                    >
+                      + Create Event for this Day
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
           <Card className="bg-white/[0.02] border-white/5">
             <h3 className="text-[11px] font-900 text-white uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
-              Agenda: {monthName}
+              {agendaTitle}
             </h3>
             <div className="space-y-3">
-              {monthEventsSide.length > 0 ? monthEventsSide.map((e, i) => (
-                <div
-                  key={i}
-                  onClick={() => openModal('view-event', e)}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] hover:border-[#38bdf8]/30 transition-all group cursor-pointer shadow-xl relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/10" />
-                  <div className="w-11 h-11 bg-white/[0.05] rounded-xl flex flex-col items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-inner border border-white/10">
-                    <span className="text-[16px] font-900 text-white tracking-tighter leading-none">{getPacificParts(e.date)?.day || '—'}</span>
-                    <span className="text-[8px] text-[#38bdf8] font-900 uppercase mt-1 tracking-widest">{monthName.slice(0, 3)}</span>
-                  </div>
-                  <div className="flex-1 min-w-0 relative z-10">
-                    <div className="flex items-center gap-2">
-                      <p className="text-[14px] font-800 text-white truncate tracking-tight">{e.title}</p>
-                      {e.event_status !== 'completed' && isOverdue(e.date) && (
-                        <span className="text-[9px] font-900 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded uppercase tracking-widest">Overdue</span>
-                      )}
-                      {e.event_status !== 'completed' && isDueToday(e.date) && (
-                        <span className="text-[9px] font-900 bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-widest">Due Today</span>
-                      )}
+              {sideAgendaEvents.length > 0 ? sideAgendaEvents.map((e, i) => {
+                const p = getPacificParts(e.date);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => openModal('view-event', e)}
+                    className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] hover:border-[#38bdf8]/30 transition-all group cursor-pointer shadow-xl relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/10" />
+                    <div className="w-11 h-11 bg-white/[0.05] rounded-xl flex flex-col items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-inner border border-white/10">
+                      <span className="text-[16px] font-900 text-white tracking-tighter leading-none">{p?.day || '—'}</span>
+                      <span className="text-[8px] text-[#38bdf8] font-900 uppercase mt-1 tracking-widest">{viewMode === 'month' ? monthName.slice(0, 3) : formatPSTTime(e.date) || 'All Day'}</span>
                     </div>
-                    <p className="text-[10px] text-[#8a94a6] font-900 uppercase tracking-widest mt-0.5 opacity-60">
-                      {(e.categories && e.categories[0]) || e.type.replace('_', ' ')}
-                    </p>
+                    <div className="flex-1 min-w-0 relative z-10">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-800 text-white truncate tracking-tight">{e.title}</p>
+                        {e.event_status !== 'completed' && isOverdue(e.date) && (
+                          <span className="text-[9px] font-900 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded uppercase tracking-widest">Overdue</span>
+                        )}
+                        {e.event_status !== 'completed' && isDueToday(e.date) && (
+                          <span className="text-[9px] font-900 bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-widest">Due Today</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[#8a94a6] font-900 uppercase tracking-widest mt-0.5 opacity-60">
+                        {(e.categories && e.categories[0]) || e.type.replace('_', ' ')}
+                      </p>
+                    </div>
+                    <div 
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]"
+                      style={{ color: getEventColor(e), backgroundColor: getEventColor(e) }}
+                    />
                   </div>
-                  <div 
-                    className="w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]"
-                    style={{ color: getEventColor(e), backgroundColor: getEventColor(e) }}
-                  />
-                </div>
-              )) : (
+                );
+              }) : (
                 <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-3xl bg-white/[0.01]">
                   <p className="text-[12px] text-[#8a94a6] font-800 uppercase tracking-widest opacity-40">No entries detected</p>
                   <p className="text-[10px] text-[#8a94a6] mt-2 italic">Calendar sync optimized.</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
 export function downloadFile(filename, content = "Dummy legal document content.") {
@@ -312,31 +312,37 @@ export function CustomSelect({
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  const normalizedOptions = options.map(opt => {
-    if (opt === null || opt === undefined) {
-      return { value: '', label: '' };
-    }
-    if (typeof opt === 'string' || typeof opt === 'number') {
-      return { value: opt, label: String(opt) };
-    }
-    return {
-      value: opt.value !== undefined ? opt.value : opt.id,
-      label: opt.label !== undefined ? opt.label : (opt.name || String(opt.value)),
-      color: opt.color,
-      icon: opt.icon
-    };
-  });
+  const normalizedOptions = useMemo(() => {
+    return options.map(opt => {
+      if (opt === null || opt === undefined) {
+        return { value: '', label: '' };
+      }
+      if (typeof opt === 'string' || typeof opt === 'number') {
+        return { value: opt, label: String(opt) };
+      }
+      return {
+        value: opt.value !== undefined ? opt.value : opt.id,
+        label: opt.label !== undefined ? opt.label : (opt.name || String(opt.value)),
+        color: opt.color,
+        icon: opt.icon
+      };
+    });
+  }, [options]);
 
-  const selectedOption = normalizedOptions.find(opt => String(opt.value ?? '') === String(value ?? ''));
+  const selectedOption = useMemo(() => {
+    return normalizedOptions.find(opt => String(opt.value ?? '') === String(value ?? ''));
+  }, [normalizedOptions, value]);
 
   const isSearchable = searchable !== undefined ? searchable : normalizedOptions.length > 8;
 
-  const filteredOptions = isSearchable && searchTerm.trim()
-    ? normalizedOptions.filter(opt =>
-        String(opt.label).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(opt.value).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : normalizedOptions;
+  const filteredOptions = useMemo(() => {
+    if (!isSearchable || !searchTerm.trim()) return normalizedOptions;
+    const lower = searchTerm.toLowerCase();
+    return normalizedOptions.filter(opt =>
+      String(opt.label).toLowerCase().includes(lower) ||
+      String(opt.value).toLowerCase().includes(lower)
+    );
+  }, [isSearchable, searchTerm, normalizedOptions]);
 
   const toggleOpen = () => {
     if (disabled) return;
