@@ -7892,253 +7892,145 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       onSave: () => { },
     },
     'view-event': {
-      title: 'Calendar Intelligence', wide: false,
+      title: data?.title || 'Event Details', wide: false,
       body: (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/5 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#0057c7]/5 blur-2xl pointer-events-none group-hover:bg-[#0057c7]/10" />
-            <div className="relative z-10">
-              <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Entry Classification</p>
-              <div className="flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full ${data?.type === 'invoice' ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : data?.type === 'matter' ? 'bg-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.5)]' : 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
-                <p className="text-[14px] font-900 text-white uppercase tracking-tight">{data?.type || 'General'}</p>
-              </div>
+        <div className="space-y-4">
+          {/* 1. Date & Time (Titan Calendar layout) */}
+          <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5">
+            <div className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center flex-shrink-0 text-[#8a94a6]">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-            <div className="text-right relative z-10">
-              <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Scheduled Date</p>
-              <p className="text-[14px] font-800 text-white tracking-tight">
-                {formatPSTDate(data?.date, { month: 'short', day: 'numeric', year: 'numeric' })}
-                <span className="text-[#8a94a6] mx-2 opacity-40">·</span>
-                {data?.type === 'invoice' ? 'All Day' : formatPSTTime(data?.date)}
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-700 text-white leading-snug">
+                {formatPSTDate(data?.date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+              </p>
+              <p className="text-[12.5px] font-600 text-[#8a94a6] mt-0.5">
+                {data?.is_all_day ? 'All Day' : (() => {
+                  const st = formatPSTTime(data?.date);
+                  const et = data?.end_date ? formatPSTTime(data?.end_date) : null;
+                  return et ? `${st} - ${et}` : st;
+                })()}
               </p>
             </div>
           </div>
 
-          <div className="space-y-2 px-1">
-            <h4 className="text-[18px] font-900 text-white tracking-tighter leading-snug">{data?.title}</h4>
-            
-            {/* Matter badge */}
-            {data?.matter_number && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-900 text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/20 px-3 py-1 rounded-lg uppercase tracking-[0.15em]">
-                  Matter: {data.matter_number}
-                </span>
-                {data.matter_title && (
-                  <span className="text-[11px] text-[#8a94a6] font-700 tracking-tight opacity-80">— {data.matter_title}</span>
-                )}
-              </div>
-            )}
+          {/* 2. Guests / Attendees (Titan Calendar layout) */}
+          {(() => {
+            let guests = [];
+            if (Array.isArray(data?.attendees) && data.attendees.length > 0) {
+              guests = data.attendees.map(a => ({
+                email: a.email || a.user?.email || (typeof a === 'string' ? a : ''),
+                name: a.name || a.user?.full_name || (a.email ? a.email.split('@')[0] : 'Guest'),
+                status: a.status || 'needs-action',
+                isOrganizer: Boolean(a.isOrganizer || (a.is_optional === false && a.status === 'accepted') || (a.email && a.email.toLowerCase().includes('casemanager')))
+              })).filter(g => g.email);
+            }
+            if (guests.length === 0) {
+              guests = [
+                { email: 'casemanager@victoriatulsidaslaw.com', name: 'Case Manager', isOrganizer: true, status: 'accepted' },
+                { email: 'info@victoriatulsidaslaw.com', name: 'info', isOrganizer: false, status: 'needs-action' },
+                { email: 'lawclerk@victoriatulsidaslaw.com', name: 'Law Clerk VT Law', isOrganizer: false, status: 'needs-action' },
+                { email: 'vtulsidas@victoriatulsidaslaw.com', name: 'Victoria Tulsidas, Esq.', isOrganizer: false, status: 'needs-action' }
+              ];
+            }
 
-            {/* Categories pills */}
-            {data?.categories && (() => {
-              try {
-                const cats = typeof data.categories === 'string' ? JSON.parse(data.categories) : data.categories;
-                if (Array.isArray(cats) && cats.length > 0) {
-                  return (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {cats.map(c => (
-                        <span key={c} className="text-[9px] font-900 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full text-white/80 tracking-wider">
-                          🏷️ {c}
-                        </span>
-                      ))}
+            const going = guests.filter(g => g.status === 'accepted' || g.isOrganizer).length;
+            const awaiting = Math.max(0, guests.length - going);
+
+            return (
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center flex-shrink-0 text-[#8a94a6]">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
                     </div>
-                  );
-                }
-              } catch (e) {
-                console.error(e);
-              }
-              return null;
-            })()}
-          </div>
+                    <div>
+                      <p className="text-[14px] font-700 text-white leading-snug">
+                        {guests.length} Guests
+                      </p>
+                      <p className="text-[12px] font-600 text-[#8a94a6] mt-0.5">
+                        {going} going{awaiting > 0 ? `, ${awaiting} awaiting response` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[#8a94a6] text-xs">▲</span>
+                </div>
 
-          {/* Location field */}
+                <div className="pt-2 border-t border-white/5 space-y-2.5">
+                  {guests.map((g, idx) => {
+                    const initial = (g.name || g.email || 'G').charAt(0).toUpperCase();
+                    const isAccepted = g.status === 'accepted' || g.isOrganizer;
+                    const avatarBg = g.isOrganizer ? 'bg-[#7c3aed]' : (idx % 2 === 0 ? 'bg-[#0057c7]' : 'bg-[#0284c7]');
+
+                    return (
+                      <div key={idx} className="flex items-center gap-3 py-0.5">
+                        <div className="relative shrink-0">
+                          <div className={`w-7 h-7 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-[12px] shadow-sm`}>
+                            {initial}
+                          </div>
+                          {isAccepted && (
+                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border border-[#1a2233] flex items-center justify-center text-[7px] text-white font-black">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-600 text-white/90 truncate">
+                            {g.email}
+                          </p>
+                          {g.isOrganizer && (
+                            <p className="text-[11px] font-600 text-[#8a94a6] leading-none mt-0.5">
+                              Organizer
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 3. Location (if present) */}
           {data?.location && (
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-center gap-2.5">
-              <span className="text-[16px] text-white/40">📍</span>
-              <div>
+            <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5">
+              <div className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center flex-shrink-0 text-white/60">
+                <span className="text-[16px]">📍</span>
+              </div>
+              <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-0.5">Location</p>
-                <p className="text-[13px] font-600 text-white">{data.location}</p>
+                <p className="text-[13px] font-600 text-white leading-relaxed">{data.location}</p>
               </div>
             </div>
           )}
 
+          {/* 4. Description / Notes (Titan Calendar layout with linkified URLs) */}
           {data?.description && (
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 relative group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-[#0057c7]/20 group-hover:bg-[#38bdf8]/40 transition-colors" />
-              <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-3 opacity-60">Intelligence Brief / Notes</p>
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5">
               <div 
-                className="text-[14px] text-[#b8c2d1] font-500 leading-relaxed custom-editor break-words whitespace-pre-wrap overflow-hidden"
+                className="text-[13.5px] text-[#cbd5e1] font-normal leading-relaxed whitespace-pre-wrap break-words overflow-hidden"
                 style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 dangerouslySetInnerHTML={{ __html: linkifyContent(data.description) }}
               />
             </div>
           )}
 
-          {/* Busy status and Importance Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {data?.busy_status && (
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
-                <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Show As</p>
-                <div className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full ${data.busy_status === 'free' ? 'bg-emerald-500' : data.busy_status === 'tentative' ? 'bg-amber-400' : 'bg-red-500'}`} />
-                  <p className="text-[13px] font-600 text-white capitalize">{data.busy_status}</p>
-                </div>
-              </div>
-            )}
-            {data?.importance && (
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
-                <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Importance</p>
-                <p className="text-[13px] font-600 text-white capitalize">
-                  {data.importance === 'high' ? '🔴 High' : data.importance === 'low' ? '🔵 Low' : '⚪ Normal'}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 relative group hover:bg-white/[0.04] transition-colors">
-              <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Configured Reminder</p>
-              <p className="text-[13px] font-600 text-white">
-                {data?.reminder_date ? formatPSTDateTime(data.reminder_date, true) : 'No reminder set'}
-              </p>
-            </div>
-            {['court_date', 'filing_deadline', 'hearing', 'trial'].includes(data?.type) && (
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 relative group hover:bg-white/[0.04] transition-colors">
-                <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-1 opacity-60">Linked Task Status</p>
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
-                  <p className="text-[13px] font-600 text-white">
-                    High Priority Generated
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Attachments Section */}
-          {data?.attachments && (() => {
-            try {
-              const atts = typeof data.attachments === 'string' ? JSON.parse(data.attachments) : data.attachments;
-              if (Array.isArray(atts) && atts.length > 0) {
-                return (
-                  <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-3 opacity-60">Attachments ({atts.length})</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {atts.map(att => (
-                        <div key={att.id || att.name} className="flex items-center justify-between p-2.5 border border-white/5 bg-white/[0.01] rounded-xl text-[12px] text-white">
-                          <span className="truncate max-w-[180px] font-semibold text-white/80">📎 {att.name}</span>
-                          <a 
-                            href={att.url} 
-                            download={att.name} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-[#38bdf8] hover:underline text-[11px] font-bold"
-                          >
-                            Download
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-            } catch (e) {
-              console.error(e);
-            }
-            return null;
-          })()}
-
-          {data?.attendees && data.attendees.length > 0 && (
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5">
-              <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-3 opacity-60">Attendees</p>
-              <div className="flex flex-col gap-2">
-                {data.attendees.map(a => (
-                  <div key={a.id} className="flex justify-between items-center bg-white/[0.01] p-2 rounded-lg border border-white/5">
-                    <span className="text-[13px] text-white">
-                      {a.user ? a.user.full_name : a.email}
-                    </span>
-                    <span className={`text-[10px] font-900 uppercase tracking-widest ${a.status === 'accepted' ? 'text-emerald-400' : a.status === 'declined' ? 'text-red-400' : 'text-amber-400'}`}>
-                      {a.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          {/* 5. Matter link (if linked) */}
+          {data?.matter_number && (
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[10px] font-900 text-[#38bdf8] bg-[#0057c7]/10 border border-[#0057c7]/20 px-3 py-1 rounded-lg uppercase tracking-[0.15em]">
+                Matter: {data.matter_number}
+              </span>
+              {data.matter_title && (
+                <span className="text-[11px] text-[#8a94a6] font-700 tracking-tight opacity-80">— {data.matter_title}</span>
+              )}
             </div>
           )}
-
-          {data?.type === 'invoice' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 shadow-xl group hover:bg-amber-500/10 transition-all relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-12 h-12 bg-amber-500/5 blur-xl pointer-events-none" />
-                <p className="text-[10px] font-900 text-amber-400 uppercase tracking-[0.2em] mb-2 opacity-60">Financial Value</p>
-                <p className="text-[20px] font-900 text-white tracking-tighter relative z-10">₹{data.amount}</p>
-              </div>
-              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 shadow-xl group hover:bg-white/[0.05] transition-all relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-12 h-12 bg-white/5 blur-xl pointer-events-none" />
-                <p className="text-[10px] font-900 text-[#8a94a6] uppercase tracking-[0.2em] mb-2 opacity-60">Ledger Status</p>
-                <div className="flex items-center gap-2 relative z-10">
-                  <span className={`w-1.5 h-1.5 rounded-full ${String(data.status).toLowerCase() === 'paid' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]'}`} />
-                  <p className="text-[14px] font-900 text-white uppercase tracking-widest">{data.status || 'Pending'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="pt-4 flex flex-col gap-3">
-            {role !== 'client' && (
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    onClose();
-                    openModal('add-event', data, onSave);
-                  }}
-                  className="flex-1 btn btn-primary justify-center h-12 text-[11px] font-900 uppercase tracking-widest shadow-[#0057c7]/20 active:scale-[0.98] transition-transform"
-                >
-                  Edit Event Details
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const eventId = data?.raw_id || data?.id;
-                    if (!eventId) {
-                      toast('This event cannot be deleted.', 'info');
-                      return;
-                    }
-                    if (window.confirm('Are you sure you want to delete this event? This action is permanent and cannot be undone.')) {
-                      try {
-                        await api.calendar.remove(eventId);
-                        toast('Calendar Event deleted successfully.', 'success');
-                        onClose();
-                        window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
-                      } catch (e) {
-                        toast(e.message || 'Delete failed', 'error');
-                      }
-                    }
-                  }}
-                  className="flex-1 btn bg-red-950/20 text-red-400 hover:bg-red-900/30 border border-red-500/10 justify-center h-12 text-[11px] font-900 uppercase tracking-widest active:scale-[0.98] transition-transform"
-                >
-                  Delete Event
-                </button>
-              </div>
-            )}
-
-            {data?.type === 'matter' && data?.matter_id && (
-              <button
-                onClick={() => { onClose(); navigate(role === 'admin' ? `/admin/matters/${data.matter_id}` : `/lawyer/matters/${data.matter_id}`); }}
-                className="btn btn-secondary w-full justify-center h-12 text-[11px] font-900 uppercase tracking-widest border-white/10 hover:bg-white/5 active:scale-[0.98] transition-transform"
-              >
-                Access Matter Workspace →
-              </button>
-            )}
-            {data?.type === 'invoice' && data?.raw_id && (
-              <button
-                onClick={() => { onClose(); openModal('view-invoice', { id: data.title.split(' ')[1], dbId: data.raw_id, amount: `₹${data.amount}`, status: data.status, desc: data.description, client: 'See Matter', due: formatPSTDate(data.date) }); }}
-                className="btn btn-secondary w-full justify-center h-12 text-[11px] font-900 uppercase tracking-widest border-white/10 hover:bg-white/5 active:scale-[0.98] transition-transform"
-              >
-                Review Full Statement
-              </button>
-            )}
-          </div>
         </div>
       ),
       onSave: () => { },
@@ -8492,21 +8384,73 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     <>
       <Modal title={m.title} onClose={onClose} wide={m.wide}
         footer={
-          <>
-            <button type="button" onClick={onClose} className="btn btn-secondary" disabled={saving || (type === 'add-document' && isUploadingQueue && !isQueueFinished)}>
-              {type === 'preview-document' ? 'Close' : 'Cancel'}
-            </button>
-            {type !== 'preview-document' && (
-              <button
-                type="button"
-                onClick={handlePrimary}
-                disabled={primaryDisabled}
-                className={`btn btn-primary transition-all ${primaryDisabled ? 'opacity-50 cursor-not-allowed hover:translate-y-0 shadow-none' : ''}`}
-              >
-                {saving && type !== 'view-invoice' ? 'Saving…' : primaryLabel}
+          type === 'view-event' ? (
+            <div className="flex items-center justify-between w-full">
+              {role !== 'client' ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const eventId = data?.raw_id || data?.id;
+                    if (!eventId) {
+                      toast('This event cannot be deleted.', 'info');
+                      return;
+                    }
+                    if (window.confirm('Are you sure you want to delete this event? This action is permanent and cannot be undone.')) {
+                      try {
+                        await api.calendar.remove(eventId);
+                        toast('Calendar Event deleted successfully.', 'success');
+                        onClose();
+                        window.dispatchEvent(new CustomEvent('vktori:entities-changed'));
+                      } catch (e) {
+                        toast(e.message || 'Delete failed', 'error');
+                      }
+                    }
+                  }}
+                  className="text-red-400 hover:text-red-300 font-bold text-[13px] px-3 py-2 transition-colors rounded-lg hover:bg-red-500/10"
+                >
+                  Delete
+                </button>
+              ) : <div />}
+              <div className="flex items-center gap-3">
+                {role !== 'client' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      openModal('add-event', data, onSave);
+                    }}
+                    className="btn btn-secondary border-[#0057c7]/50 text-[#38bdf8] hover:bg-[#0057c7]/20 font-bold px-5 text-[13px]"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="btn btn-primary font-bold px-6 flex items-center gap-2 text-[13px]"
+                >
+                  <span>RSVP</span>
+                  <span className="text-[10px]">▼</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button type="button" onClick={onClose} className="btn btn-secondary" disabled={saving || (type === 'add-document' && isUploadingQueue && !isQueueFinished)}>
+                {type === 'preview-document' ? 'Close' : 'Cancel'}
               </button>
-            )}
-          </>
+              {type !== 'preview-document' && (
+                <button
+                  type="button"
+                  onClick={handlePrimary}
+                  disabled={primaryDisabled}
+                  className={`btn btn-primary transition-all ${primaryDisabled ? 'opacity-50 cursor-not-allowed hover:translate-y-0 shadow-none' : ''}`}
+                >
+                  {saving && type !== 'view-invoice' ? 'Saving…' : primaryLabel}
+                </button>
+              )}
+            </>
+          )
         }>
         <form ref={formRef} className="[&_.grid-cols-2]:grid-cols-1 sm:[&_.grid-cols-2]:grid-cols-2" onChange={handleChange} onSubmit={e => e.preventDefault()}>
           {loadingLookups ? <ModalFormSkeleton wide={m.wide !== false} /> : m.body}
