@@ -16,6 +16,7 @@ export function LawyerDashboard({ navigate, toast, openModal }) {
   const [error, setError] = useState('');
   const [activeTimer, setActiveTimer] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
+  const [upcomingHearings, setUpcomingHearings] = useState([]);
   const stoppingRef = useRef(false);
 
   const [refreshTick, setRefreshTick] = useState(0);
@@ -33,17 +34,25 @@ export function LawyerDashboard({ navigate, toast, openModal }) {
       try {
         const user = JSON.parse(localStorage.getItem('vktori_user') || 'null');
         const lawyerId = user?.id;
-        const [dashRes, matterRes, clientRes, timerRes] = await Promise.all([
+        const [dashRes, matterRes, clientRes, timerRes, calRes] = await Promise.all([
           api.dashboard.lawyer(),
           api.matters.list({ lawyer_id: lawyerId, limit: 8 }),
           api.clients.list({ limit: 20 }),
           api.timers.active(),
+          api.calendar.list({ scope: 'mine' }).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
         setDashboard(dashRes.data || null);
         setMatters(Array.isArray(matterRes.data) ? matterRes.data : []);
         setClients(Array.isArray(clientRes.data) ? clientRes.data : []);
         if (timerRes.data) setActiveTimer(timerRes.data);
+
+        const calEvents = Array.isArray(calRes?.data) ? calRes.data : [];
+        const hearings = calEvents
+          .filter(e => e.type === 'hearing' || e.is_court_event || e.court_related || e.type === 'court_date' || e.type === 'trial')
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 5);
+        setUpcomingHearings(hearings);
       } catch (e) {
         if (!cancelled) setError(e.message || 'Failed to load dashboard');
       } finally {
@@ -234,12 +243,44 @@ export function LawyerDashboard({ navigate, toast, openModal }) {
             </h3>
             <button onClick={() => navigate('/lawyer/calendar')} className="text-[11px] text-[#38bdf8] hover:text-white font-800 uppercase tracking-widest transition-colors">Calendar →</button>
           </div>
-          <div className="py-12 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/20 mb-4">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          {upcomingHearings.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingHearings.map((h, idx) => (
+                <div
+                  key={h.id || idx}
+                  onClick={() => navigate('/lawyer/calendar')}
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-[#ef4444]/30 cursor-pointer transition-all group"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col items-center justify-center shrink-0">
+                      <span className="text-[10px] font-900 text-red-400 uppercase leading-none">
+                        {new Date(h.date).toLocaleDateString('en-US', { month: 'short' })}
+                      </span>
+                      <span className="text-[13px] font-900 text-white leading-tight mt-0.5">
+                        {new Date(h.date).getDate()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-700 text-white truncate group-hover:text-[#38bdf8] transition-colors">{h.title}</p>
+                      <p className="text-[11px] text-[#8a94a6] truncate mt-0.5">
+                        {h.court_name ? `${h.court_name} ${h.court_room ? `· Room ${h.court_room}` : ''}` : (h.matter_number ? `Matter: #${h.matter_number}` : 'Scheduled Hearing')}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-800 text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                    Hearing
+                  </span>
+                </div>
+              ))}
             </div>
-            <p className="text-[13px] text-[#8a94a6] font-600 italic">No hearing schedule data available.</p>
-          </div>
+          ) : (
+            <div className="py-12 flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/20 mb-4">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </div>
+              <p className="text-[13px] text-[#8a94a6] font-600 italic">No hearing schedule data available.</p>
+            </div>
+          )}
         </Card>
 
         {/* My Parties */}

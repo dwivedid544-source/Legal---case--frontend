@@ -413,7 +413,7 @@ export const reportsAPI = {
 };
 
 export const calendarAPI = {
-  list: (params) => request('/calendar', { params }),
+  list: (params) => request(`/calendar${buildQuery(params)}`),
   create: (data) => request('/calendar', { method: 'POST', body: data }),
   update: (id, data) => request(`/calendar/${id}`, { method: 'PUT', body: data }),
   remove: (id) => request(`/calendar/${id}`, { method: 'DELETE' }),

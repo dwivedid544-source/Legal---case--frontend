@@ -7889,8 +7889,26 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
 // ─────────────────────────────────────────────────────────
 //  CALENDAR PAGE
 // ─────────────────────────────────────────────────────────
-export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
-  const isAdmin = role !== 'client';
+export function CalendarPage({ toast, openModal, role = 'lawyer', user }) {
+  // Resolve logged-in user and determine if the current user is an admin or lawyer
+  const currentUser = user || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('vktori_user') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const currentUserId = currentUser?.id;
+  const currentUserEmail = currentUser?.email;
+  const isAdmin = role === 'admin' || currentUser?.role === 'admin' || (Array.isArray(currentUser?.roles) && currentUser.roles.includes('admin'));
+  const isLawyer = !isAdmin && (role === 'lawyer' || currentUser?.role === 'lawyer' || (Array.isArray(currentUser?.roles) && currentUser.roles.includes('lawyer')));
+
+  // Scope: 'mine' = lawyer's own calendar; 'all' = entire firm calendar; 'lawyer' = specific selected lawyer (admin only)
+  // When ANY lawyer gets logged in, they see their own calendar by default ('mine')
+  const [calendarScope, setCalendarScope] = useState(() => (isLawyer ? 'mine' : 'all'));
+  const [selectedLawyerId, setSelectedLawyerId] = useState(() => (isLawyer && currentUserId ? String(currentUserId) : 'all'));
+  const [lawyersList, setLawyersList] = useState([]);
+
   const todayPacific = getPacificToday() || { year: new Date().getFullYear(), monthIdx: new Date().getMonth(), month: new Date().getMonth() + 1, day: new Date().getDate(), dateStr: new Date().toISOString().split('T')[0] };
   const [viewDate, setViewDate] = useState(() => new Date(todayPacific.year, todayPacific.monthIdx, todayPacific.day || 1));
   const [viewMode, setViewMode] = useState('month'); // 'day' | 'week' | 'month'
@@ -7961,14 +7979,19 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
     if (isFirstLoad.current) { setLoading(true); isFirstLoad.current = false; }
     setError('');
     try {
-      const [calRes, matRes, catsRes] = await Promise.all([
+      const [calRes, matRes, catsRes, usersRes] = await Promise.all([
         api.calendar.list(),
         api.matters.list({ limit: 500 }),
         api.calendar.listCategories({ include_inactive: true }),
+        api.users.list().catch(() => ({ data: [] })),
       ]);
       setEvents(calRes.data || []);
       const mats = Array.isArray(matRes.data) ? matRes.data : [];
       setMatterPick(mats.map((m) => ({ id: m.id, label: m.matter_number || String(m.id) })));
+
+      const allUsers = Array.isArray(usersRes?.data) ? usersRes.data : [];
+      const lawyers = allUsers.filter(u => u.role === 'lawyer' || (Array.isArray(u.roles) && u.roles.includes('lawyer')));
+      setLawyersList(lawyers);
 
       // Ensure all loaded categories have a sort_order
       const sortedCats = (catsRes.data || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -7979,6 +8002,39 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
       setLoading(false);
     }
   }, []);
+
+  const isEventForUser = useCallback((e, targetUserId, targetUserEmail) => {
+    if (!targetUserId && !targetUserEmail) return false;
+    const uid = targetUserId ? Number(targetUserId) : null;
+    const emailLower = targetUserEmail ? String(targetUserEmail).toLowerCase().trim() : null;
+
+    // 1. Direct creator
+    if (uid && e.created_by && Number(e.created_by) === uid) return true;
+
+    // 2. Assigned lawyer on matter or event
+    if (uid && e.assigned_lawyer_id && Number(e.assigned_lawyer_id) === uid) return true;
+
+    // 3. Attendee matching user_id or email
+    if (Array.isArray(e.attendees) && e.attendees.length > 0) {
+      const isAttending = e.attendees.some(a => {
+        if (uid && a.user_id && Number(a.user_id) === uid) return true;
+        if (emailLower && a.email && a.email.toLowerCase().trim() === emailLower) return true;
+        return false;
+      });
+      if (isAttending) return true;
+    }
+
+    // 4. Server-provided is_mine flag fallback
+    if (e.is_mine === true && (!targetUserId || Number(targetUserId) === currentUserId)) return true;
+
+    return false;
+  }, [currentUserId]);
+
+  const myEventsCount = useMemo(() => {
+    return events.filter(e => isEventForUser(e, currentUserId, currentUserEmail)).length;
+  }, [events, isEventForUser, currentUserId, currentUserEmail]);
+
+  const totalEventsCount = events.length;
 
   const handleMoveCategory = async (cat, direction) => {
     const idx = categories.findIndex(c => c.id === cat.id);
@@ -8282,11 +8338,19 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
     navLabel = `${viewDate.toLocaleString('en-US', { weekday: 'short' })}, ${viewDate.toLocaleString('en-US', { month: 'short' })} ${viewDate.getDate()}, ${viewDate.getFullYear()}`;
   }
 
+  const scopeDescription = isLawyer
+    ? (calendarScope === 'mine' ? `My Calendar (${currentUser?.full_name || 'Lawyer'})` : 'Entire Firm Calendar')
+    : (selectedLawyerId !== 'all'
+        ? `Lawyer: ${lawyersList.find(l => String(l.id) === String(selectedLawyerId))?.full_name || 'Selected Lawyer'}`
+        : calendarScope === 'mine'
+          ? `My Calendar (${currentUser?.full_name || 'Admin'})`
+          : 'Entire Firm Calendar');
+
   const headerSubtitle = viewMode === 'month'
-    ? `${monthName} ${year} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
+    ? `${monthName} ${year} · ${scopeDescription} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`
     : viewMode === 'week'
-      ? `Week of ${navLabel} · Pacific Time (${getPacificTimezoneAbbr(viewDate)}) · Manage hearings, deadlines & meetings`
-      : `${viewDate.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`;
+      ? `Week of ${navLabel} · ${scopeDescription} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`
+      : `${viewDate.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · ${scopeDescription} · Pacific Time (${getPacificTimezoneAbbr(viewDate)})`;
 
   const getTypeStyle = (type) => {
     switch (type) {
@@ -8301,10 +8365,28 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
 
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
+      // 1. Calendar Scope & Lawyer Filter
+      if (isLawyer) {
+        if (calendarScope === 'mine') {
+          if (!isEventForUser(e, currentUserId, currentUserEmail)) return false;
+        }
+        // Entire calendar shows all events
+      } else {
+        if (selectedLawyerId && selectedLawyerId !== 'all') {
+          const targetLawyer = lawyersList.find(l => String(l.id) === String(selectedLawyerId));
+          const tUid = targetLawyer?.id;
+          const tEmail = targetLawyer?.email;
+          if (!isEventForUser(e, tUid, tEmail)) return false;
+        } else if (calendarScope === 'mine') {
+          if (!isEventForUser(e, currentUserId, currentUserEmail)) return false;
+        }
+      }
+
+      // 2. Category / Type filter
       if (filterType === 'all') return true;
-      return e.type === filterType;
+      return e.type === filterType || (Array.isArray(e.categories) && e.categories.some(c => String(c).toLowerCase() === filterType.toLowerCase()));
     });
-  }, [events, filterType]);
+  }, [events, filterType, calendarScope, selectedLawyerId, currentUserId, currentUserEmail, lawyersList, isEventForUser, isLawyer]);
 
   // High-performance date lookup map: O(1) cell lookup instead of O(cells * events) loops
   const eventsByDate = useMemo(() => {
@@ -8475,6 +8557,97 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
           )}
         </div>
 
+        {/* Calendar Scope Switcher: My Calendar vs Entire Calendar */}
+        <div className="flex items-center bg-white/[0.04] p-1 rounded-xl border border-white/10 backdrop-blur-md shadow-inner gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setCalendarScope('mine');
+              if (currentUserId) setSelectedLawyerId(String(currentUserId));
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-800 uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+              calendarScope === 'mine'
+                ? 'bg-gradient-to-r from-[#0057c7] to-[#38bdf8] text-white shadow-[0_2px_10px_rgba(56,189,248,0.35)] font-900 scale-[1.02]'
+                : 'text-[#8a94a6] hover:text-white hover:bg-white/5'
+            }`}
+            title="View your own calendar (hearings, deadlines & meetings assigned to you)"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>My Calendar</span>
+            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+              calendarScope === 'mine' ? 'bg-black/30 text-white' : 'bg-white/10 text-[#8a94a6]'
+            }`}>
+              {myEventsCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setCalendarScope('all'); setSelectedLawyerId('all'); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-800 uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+              calendarScope === 'all' && (selectedLawyerId === 'all' || isLawyer)
+                ? 'bg-gradient-to-r from-[#0057c7] to-[#38bdf8] text-white shadow-[0_2px_10px_rgba(56,189,248,0.35)] font-900 scale-[1.02]'
+                : 'text-[#8a94a6] hover:text-white hover:bg-white/5'
+            }`}
+            title="View entire firm calendar across all lawyers and staff"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            </svg>
+            <span>Entire Calendar</span>
+            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+              calendarScope === 'all' && (selectedLawyerId === 'all' || isLawyer) ? 'bg-black/30 text-white' : 'bg-white/10 text-[#8a94a6]'
+            }`}>
+              {totalEventsCount}
+            </span>
+          </button>
+        </div>
+
+        {lawyersList.length > 1 && (
+          <div className="relative inline-block text-left">
+            <select
+              value={calendarScope === 'mine' && currentUserId ? String(currentUserId) : selectedLawyerId}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (isLawyer && val !== 'all' && currentUserId && Number(val) !== Number(currentUserId)) {
+                  if (toast) toast('Access restricted: Lawyers can only view their own calendar or the firm calendar.', 'warning');
+                  return;
+                }
+                setSelectedLawyerId(val);
+                if (val === 'all') {
+                  setCalendarScope('all');
+                } else if (currentUserId && Number(val) === Number(currentUserId)) {
+                  setCalendarScope('mine');
+                } else {
+                  setCalendarScope('lawyer');
+                }
+              }}
+              className="bg-white/[0.04] border border-white/10 hover:border-white/20 text-white/90 text-[11px] font-800 uppercase tracking-wider rounded-xl px-3 py-2 pr-7 appearance-none focus:outline-none focus:border-[#38bdf8] cursor-pointer"
+              title={isLawyer ? "Lawyers list (other lawyers' personal calendars are restricted)" : "Filter by specific lawyer"}
+            >
+              <option value="all" className="bg-[#0c1322] text-white">All Lawyers</option>
+              {lawyersList.map(lawyer => {
+                const isSelf = currentUserId && Number(lawyer.id) === Number(currentUserId);
+                const isRestricted = isLawyer && !isSelf;
+                return (
+                  <option
+                    key={lawyer.id}
+                    value={lawyer.id}
+                    disabled={isRestricted}
+                    className={`bg-[#0c1322] ${isRestricted ? 'text-gray-500 font-normal opacity-50' : 'text-white font-bold'}`}
+                  >
+                    {isRestricted ? '🔒 ' : ''}
+                    {lawyer.full_name || lawyer.display_name || `Lawyer #${lawyer.id}`}
+                    {isSelf ? ' (You)' : isRestricted ? ' (Restricted)' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+
         {/* Category Filters */}
         <div className="flex gap-2 mr-auto ml-2 overflow-x-auto no-scrollbar">
           <button
@@ -8514,6 +8687,51 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
           Add Event
         </button>
       </PageHeader>
+
+      {/* Calendar Scope Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className={`w-2.5 h-2.5 rounded-full ${calendarScope === 'mine' ? 'bg-[#38bdf8] shadow-[0_0_8px_#38bdf8]' : selectedLawyerId !== 'all' && !isLawyer ? 'bg-[#a855f7] shadow-[0_0_8px_#a855f7]' : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'}`} />
+          <div>
+            <p className="text-[13px] text-white font-800 tracking-tight">
+              {calendarScope === 'mine' ? (
+                <>Showing <span className="text-[#38bdf8]">Your Personal Calendar</span> · {filteredEvents.length} event{filteredEvents.length === 1 ? '' : 's'}</>
+              ) : selectedLawyerId !== 'all' && !isLawyer ? (
+                <>Showing Calendar for <span className="text-[#a855f7]">{lawyersList.find(l => String(l.id) === String(selectedLawyerId))?.full_name || 'Selected Lawyer'}</span> · {filteredEvents.length} event{filteredEvents.length === 1 ? '' : 's'}</>
+              ) : (
+                <>Showing <span className="text-emerald-400">Entire Firm Calendar</span> · {filteredEvents.length} total event{filteredEvents.length === 1 ? '' : 's'}</>
+              )}
+            </p>
+            <p className="text-[11px] text-[#8a94a6] font-500">
+              {calendarScope === 'mine'
+                ? 'Displaying only your hearings, court dates, meetings, and assigned matters.'
+                : selectedLawyerId !== 'all' && !isLawyer
+                  ? 'Filtered to events and matters assigned to or organized by this lawyer.'
+                  : 'Displaying all scheduled events, hearings, and deadlines across all lawyers in the firm.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {calendarScope === 'mine' ? (
+            <button
+              type="button"
+              onClick={() => { setCalendarScope('all'); setSelectedLawyerId('all'); }}
+              className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/90 hover:text-white border border-white/10 text-[11px] font-800 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+            >
+              <span>Switch to Entire Calendar</span>
+              <span className="text-[#38bdf8]">→</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setCalendarScope('mine'); if (currentUserId) setSelectedLawyerId(String(currentUserId)); }}
+              className="px-3.5 py-1.5 rounded-xl bg-[#0057c7]/20 hover:bg-[#0057c7]/30 text-[#38bdf8] border border-[#0057c7]/40 text-[11px] font-800 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+            >
+              <span>← Switch to My Calendar</span>
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
@@ -8573,7 +8791,16 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                               className="text-[10px] font-800 px-2 py-1 rounded-lg truncate border shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-between"
                               style={customStyle}
                             >
-                              <span className="truncate">{e.title}</span>
+                              <span className="truncate flex items-center gap-1.5">
+                                {isEventForUser(e, currentUserId, currentUserEmail) ? (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8] shrink-0" title="Your personal event" />
+                                ) : (calendarScope !== 'mine' && e.lawyer_name) ? (
+                                  <span className="text-[8px] opacity-75 font-bold uppercase shrink-0 text-white/80" title={`Lawyer: ${e.lawyer_name}`}>
+                                    [{e.lawyer_name.split(' ')[0]}]
+                                  </span>
+                                ) : null}
+                                <span className="truncate">{e.title}</span>
+                              </span>
                               {alertBadge}
                             </div>
                           );
@@ -8666,9 +8893,16 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                               className="p-2 rounded-xl border text-[11px] font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-95 space-y-1"
                               style={customStyle}
                             >
-                              <div className="flex items-center justify-between text-[10px] font-bold opacity-80">
+                              <div className="flex items-center justify-between text-[10px] font-bold opacity-80 gap-1">
                                 <span>{evTime || 'All Day'}</span>
-                                {alertBadge}
+                                <div className="flex items-center gap-1">
+                                  {isEventForUser(e, currentUserId, currentUserEmail) ? (
+                                    <span className="text-[8px] px-1 py-0.2 rounded bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/30 font-black">Mine</span>
+                                  ) : (calendarScope !== 'mine' && e.lawyer_name) ? (
+                                    <span className="text-[8px] opacity-75 truncate max-w-[55px] text-white/80 font-bold" title={`Lawyer: ${e.lawyer_name}`}>{e.lawyer_name.split(' ')[0]}</span>
+                                  ) : null}
+                                  {alertBadge}
+                                </div>
                               </div>
                               <div className="font-bold truncate text-[11px]">{e.title}</div>
                               {e.type && (
@@ -8789,6 +9023,13 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                                     Matter: #{e.matter_number}
                                   </span>
                                 )}
+                                {e.lawyer_name && (
+                                  <span className={`flex items-center gap-1 font-semibold ${
+                                    isEventForUser(e, currentUserId, currentUserEmail) ? 'text-[#38bdf8]' : 'text-white/70'
+                                  }`}>
+                                    👤 {e.lawyer_name} {isEventForUser(e, currentUserId, currentUserEmail) ? '(You)' : ''}
+                                  </span>
+                                )}
                                 {e.location && (
                                   <span className="flex items-center gap-1 text-white/50">
                                     📍 {e.location}
@@ -8899,7 +9140,7 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-[11px] text-[#8a94a6]">
+                      <div className="flex items-center gap-2 text-[11px] text-[#8a94a6] flex-wrap">
                         <span className="flex items-center gap-1 font-700 text-white/80">
                           <svg className="w-3 h-3 text-[#38bdf8] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -8910,6 +9151,14 @@ export function CalendarPage({ toast, openModal, role = 'lawyer' }) {
                         <span className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider truncate">
                           {(e.categories && e.categories[0]) || (e.type ? e.type.replace('_', ' ') : 'General')}
                         </span>
+                        {e.lawyer_name && (
+                          <>
+                            <span className="text-white/20">•</span>
+                            <span className={`text-[10px] font-700 truncate ${isEventForUser(e, currentUserId, currentUserEmail) ? 'text-[#38bdf8]' : 'text-white/60'}`}>
+                              👤 {e.lawyer_name} {isEventForUser(e, currentUserId, currentUserEmail) ? '(You)' : ''}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
 

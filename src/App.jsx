@@ -3753,15 +3753,17 @@ function ViewEventModalBody({ data }) {
         </div>
       )}
 
-      {/* 4. Calendar info (Titan Calendar "Calendar: Event created by info") */}
+      {/* 4. Calendar info & Assigned Lawyer */}
       <div className="flex items-start gap-3 pt-0.5">
         <svg className="w-5 h-5 text-[#8a94a6] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
         <div className="flex-1 min-w-0">
-          <p className="text-[13.5px] font-semibold text-white/90 leading-tight">Calendar</p>
+          <p className="text-[13.5px] font-semibold text-white/90 leading-tight">
+            {data?.lawyer_name ? `Assigned Lawyer: ${data.lawyer_name}` : 'Calendar Event'}
+          </p>
           <p className="text-[12px] text-[#8a94a6] mt-0.5">
-            Event created by info
+            {data?.is_mine ? 'Your personal schedule event' : (data?.lawyer_name ? `Part of ${data.lawyer_name}'s calendar` : 'Firm schedule')}
           </p>
         </div>
       </div>
@@ -9837,7 +9839,7 @@ function AdminContactsPage() { const ctx = useOutletContext(); return <ContactsP
 function AdminClientDetailPage() { const ctx = useOutletContext(); const { id } = useParams(); return <ClientDetailPage  {...ctx} clientId={id || "C001"} />; }
 function AdminMattersPage() { const ctx = useOutletContext(); return <CasesPage         {...ctx} />; }
 function AdminMatterDetailPage() { const ctx = useOutletContext(); const { id } = useParams(); return <CaseDetailPage    {...ctx} caseId={id || "CASE-2045"} />; }
-function AdminCalendarPage() { const ctx = useOutletContext(); return <CalendarPage      {...ctx} />; }
+function AdminCalendarPage() { const ctx = useOutletContext(); return <CalendarPage      {...ctx} role="admin" />; }
 function AdminDocumentsPage() { const ctx = useOutletContext(); return <DocumentsPage     {...ctx} />; }
 function AdminBillingPage() { const ctx = useOutletContext(); return <BillingPage       {...ctx} />; }
 function AdminEmailPage() { const ctx = useOutletContext(); return <EmailPage         {...ctx} />; }
@@ -9854,7 +9856,7 @@ function LawyerClientsWrapper() { const ctx = useOutletContext(); return <Lawyer
 function LawyerClientDetailWrapper() { const ctx = useOutletContext(); const { id } = useParams(); return <ClientDetailPage  {...ctx} clientId={id} />; }
 function LawyerMattersPage() { const ctx = useOutletContext(); return <LawyerCasesPage   {...ctx} />; }
 function LawyerMatterDetailWrapper() { const ctx = useOutletContext(); const { id } = useParams(); return <CaseDetailPage    {...ctx} caseId={id} />; }
-function LawyerCalendarPage() { const ctx = useOutletContext(); return <CalendarPage      {...ctx} />; }
+function LawyerCalendarPage() { const ctx = useOutletContext(); return <CalendarPage      {...ctx} role="lawyer" />; }
 function LawyerDocumentsPage() { const ctx = useOutletContext(); return <DocumentsPage     {...ctx} />; }
 function LawyerBillingPage() { const ctx = useOutletContext(); return <BillingPage       {...ctx} />; }
 function LawyerEmailPage() { const ctx = useOutletContext(); return <EmailPage         {...ctx} />; }

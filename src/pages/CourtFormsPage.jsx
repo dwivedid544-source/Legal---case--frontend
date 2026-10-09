@@ -8,26 +8,33 @@ const statusBadge = (s) => ({
 }[s] || { bg: 'rgba(234,179,8,0.15)', color: '#fde047', border: 'rgba(234,179,8,0.3)' });
 
 const SYSTEM_FIELDS = [
-  { key: 'case_title',    label: 'Case Title' },
-  { key: 'case_number',   label: 'Case Number' },
-  { key: 'matter_number', label: 'Matter Number' },
-  { key: 'plaintiff',     label: 'Plaintiff' },
-  { key: 'defendant',     label: 'Defendant' },
-  { key: 'filing_date',   label: 'Filing Date',   type: 'date' },
-  { key: 'hearing_date',  label: 'Hearing Date',  type: 'date' },
-  { key: 'court_name',    label: 'Court Name' },
-  { key: 'court_address', label: 'Court Address' },
-  { key: 'judge_name',    label: 'Judge Name' },
-  { key: 'attorney_name', label: 'Attorney Name' },
-  { key: 'attorney_email',label: 'Attorney Email' },
-  { key: 'firm_name',     label: 'Firm Name' },
-  { key: 'firm_address',  label: 'Firm Address' },
-  { key: 'firm_zip',      label: 'Firm Zip Code' },
-  { key: 'firm_phone',    label: 'Firm Phone' },
-  { key: 'client_name',   label: 'Client Name' },
-  { key: 'client_address',label: 'Client Address' },
-  { key: 'client_phone',  label: 'Client Phone' },
-  { key: 'client_email',  label: 'Client Email' },
+  { key: 'case_title',            label: 'Case Title' },
+  { key: 'case_number',           label: 'Case Number' },
+  { key: 'matter_number',         label: 'Matter Number' },
+  { key: 'plaintiff',             label: 'Plaintiff / Petitioner' },
+  { key: 'defendant',             label: 'Defendant / Respondent' },
+  { key: 'filing_date',           label: 'Filing Date',   type: 'date' },
+  { key: 'hearing_date',          label: 'Hearing Date',  type: 'date' },
+  { key: 'hearing_time',          label: 'Hearing Time' },
+  { key: 'court_name',            label: 'Court Name' },
+  { key: 'court_county',          label: 'Court County' },
+  { key: 'court_department',      label: 'Court Department' },
+  { key: 'court_address',         label: 'Court Address' },
+  { key: 'judge_name',            label: 'Judge Name' },
+  { key: 'attorney_name',         label: 'Attorney Name' },
+  { key: 'bar_number',            label: 'State Bar No' },
+  { key: 'attorney_for',          label: 'Attorney For' },
+  { key: 'attorney_email',        label: 'Attorney Email' },
+  { key: 'firm_name',             label: 'Firm Name' },
+  { key: 'firm_address',          label: 'Firm Address' },
+  { key: 'firm_zip',              label: 'Firm Zip Code' },
+  { key: 'firm_phone',            label: 'Firm Phone' },
+  { key: 'client_name',           label: 'Client Name' },
+  { key: 'party_role',            label: 'Client Role' },
+  { key: 'client_address',        label: 'Client Address' },
+  { key: 'client_city_state_zip', label: 'Client City, State, Zip' },
+  { key: 'client_phone',          label: 'Client Phone' },
+  { key: 'client_email',          label: 'Client Email' },
 ];
 
 const toDateValue = (v) => {
@@ -316,7 +323,8 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
 
   const openWizard = async (template, draft = null) => {
     // Open modal instantly without waiting for network
-    setWizard({ template, matter_id: draft?.matter?.id || '', draft_id: draft?.id || null });
+    const initialMatterId = draft?.matter?.id || '';
+    setWizard({ template, matter_id: initialMatterId, draft_id: draft?.id || null });
     setPrefillData({});
     setFormValues(draft?.form_data || {});
     setWizardStep(draft ? 2 : 1);
@@ -331,15 +339,29 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
       console.error('Failed to fetch full template detail:', e);
     }
     
-    if (draft?.matter?.id) {
-      try { const r = await api.courtForms.prefill(draft.matter.id); setPrefillData(r.data || {}); } catch {}
+    if (initialMatterId) {
+      try {
+        const r = await api.courtForms.prefill(initialMatterId);
+        const data = r.data || {};
+        setPrefillData(data);
+        setFormValues(prev => ({ ...data, ...(draft?.form_data || prev || {}) }));
+      } catch (err) {
+        console.error('Failed to prefill draft matter:', err);
+      }
     }
   };
 
   const handleMatterSelect = async id => {
     setWizard(p => ({ ...p, matter_id: id }));
     if (!id) return;
-    try { const r = await api.courtForms.prefill(id); setPrefillData(r.data || {}); setFormValues(r.data || {}); } catch {}
+    try {
+      const r = await api.courtForms.prefill(id);
+      const data = r.data || {};
+      setPrefillData(data);
+      setFormValues(data);
+    } catch (err) {
+      console.error('Failed to prefill matter:', err);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -783,10 +805,27 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     Select Matter <span style={{ color: '#f87171' }}>*</span>
                   </label>
                   <MatterDropdown matters={matters} value={wizard.matter_id} onChange={handleMatterSelect}/>
-                  {!wizard.matter_id && (
+                  {!wizard.matter_id ? (
                     <p style={{ fontSize: 12, color: '#8a94a6', marginTop: 10 }}>
                       💡 {matters.length} matter{matters.length !== 1 ? 's' : ''} available
                     </p>
+                  ) : (
+                    <div style={{ marginTop: 14, padding: '12px 16px', background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 16 }}>⚡</span>
+                        <div>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8', margin: 0 }}>
+                            Auto-Populated from Case: {matters.find(m => String(m.id) === String(wizard.matter_id))?.title || 'Selected Matter'}
+                          </p>
+                          <p style={{ fontSize: 11, color: '#8a94a6', margin: '2px 0 0 0' }}>
+                            Client: <strong style={{ color: '#fff' }}>{prefillData.client_name || 'Loading...'}</strong> · Court: <strong style={{ color: '#fff' }}>{prefillData.court_name || 'Loading...'}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: '#38bdf8', color: '#000', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        READY TO FILL
+                      </span>
+                    </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 28 }}>
                     <button onClick={() => { if (!wizard.matter_id) { toast?.('Please select a matter first', 'error'); return; } setWizardStep(2); }}
@@ -804,7 +843,7 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: 10 }}>
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#38bdf8" strokeWidth={2}><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <p style={{ fontSize: 12, color: '#38bdf8', margin: 0 }}>Fields tagged <strong>AUTO</strong> were prefilled from the database. You can edit anything before generating.</p>
+                    <p style={{ fontSize: 12, color: '#38bdf8', margin: 0 }}>Fields tagged <strong>AUTO</strong> were automatically pulled from the client, case, and court records. You can review or edit any value before generating the final PDF.</p>
                   </div>
                   {/* Form divided into sections to avoid overlap and look clean */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -812,7 +851,7 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     {/* Section 1: Matter Details */}
                     <div>
                       <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
-                        ⚖️ Matter Details
+                        ⚖️ Matter &amp; Case Identification
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                         {[
@@ -841,8 +880,8 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                         {[
-                          { key: 'plaintiff', label: 'Plaintiff' },
-                          { key: 'defendant', label: 'Defendant' },
+                          { key: 'plaintiff', label: 'Plaintiff / Petitioner' },
+                          { key: 'defendant', label: 'Defendant / Respondent' },
                         ].map(({ key, label }) => (
                           <div key={key}>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8a94a6', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</label>
@@ -860,16 +899,18 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     {/* Section 3: Client Details */}
                     <div>
                       <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
-                        👤 Client Contact Details
+                        👤 Client Information (Auto-Populated)
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                         {[
-                          { key: 'client_name', label: 'Client Name' },
+                          { key: 'client_name', label: 'Client Full Name' },
+                          { key: 'party_role', label: 'Client Role (Plaintiff/Respondent)' },
                           { key: 'client_email', label: 'Client Email' },
                           { key: 'client_phone', label: 'Client Phone' },
-                          { key: 'client_address', label: 'Client Address' },
-                        ].map(({ key, label }) => (
-                          <div key={key} style={{ gridColumn: key === 'client_address' ? 'span 2' : 'auto' }}>
+                          { key: 'client_address', label: 'Client Street Address', fullSpan: true },
+                          { key: 'client_city_state_zip', label: 'Client City, State, Zip' },
+                        ].map(({ key, label, fullSpan }) => (
+                          <div key={key} style={{ gridColumn: fullSpan ? 'span 2' : 'auto' }}>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8a94a6', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</label>
                             <div style={{ position: 'relative' }}>
                               <input type="text" value={formValues[key] || ''}
@@ -885,18 +926,20 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     {/* Section 4: Attorney & Firm Details */}
                     <div>
                       <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
-                        🏢 Attorney &amp; Firm Information
+                        🏢 Attorney &amp; Firm Information (Front Header)
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                         {[
                           { key: 'attorney_name', label: 'Attorney Name' },
+                          { key: 'bar_number', label: 'State Bar No (SBN)' },
+                          { key: 'attorney_for', label: 'Attorney For (Party)' },
                           { key: 'attorney_email', label: 'Attorney Email' },
                           { key: 'firm_name', label: 'Firm Name' },
                           { key: 'firm_phone', label: 'Firm Phone' },
-                          { key: 'firm_address', label: 'Firm Address' },
+                          { key: 'firm_address', label: 'Firm Address', fullSpan: true },
                           { key: 'firm_zip', label: 'Firm Zip Code' },
-                        ].map(({ key, label }) => (
-                          <div key={key} style={{ gridColumn: key === 'firm_address' ? 'span 2' : 'auto' }}>
+                        ].map(({ key, label, fullSpan }) => (
+                          <div key={key} style={{ gridColumn: fullSpan ? 'span 2' : 'auto' }}>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8a94a6', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</label>
                             <div style={{ position: 'relative' }}>
                               <input type="text" value={formValues[key] || ''}
@@ -912,16 +955,19 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     {/* Section 5: Court details */}
                     <div>
                       <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
-                        🏛️ Court Details
+                        🏛️ Court &amp; Hearing Details (Auto-Populated)
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                         {[
                           { key: 'court_name', label: 'Court Name' },
-                          { key: 'judge_name', label: 'Judge Name' },
-                          { key: 'court_address', label: 'Court Address' },
+                          { key: 'court_county', label: 'Court County' },
+                          { key: 'court_department', label: 'Court Department / Room' },
+                          { key: 'judge_name', label: 'Presiding Judge' },
+                          { key: 'court_address', label: 'Court Address', fullSpan: true },
                           { key: 'hearing_date', label: 'Hearing Date', type: 'date' },
-                        ].map(({ key, label, type }) => (
-                          <div key={key} style={{ gridColumn: key === 'court_address' ? 'span 2' : 'auto' }}>
+                          { key: 'hearing_time', label: 'Hearing Time' },
+                        ].map(({ key, label, type, fullSpan }) => (
+                          <div key={key} style={{ gridColumn: fullSpan ? 'span 2' : 'auto' }}>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8a94a6', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</label>
                             <div style={{ position: 'relative' }}>
                               <input type={type || 'text'} value={type === 'date' ? toDateValue(formValues[key]) : (formValues[key] || '')}
@@ -937,10 +983,10 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     {/* Section 6: Form Specific Details (Custom Fields) */}
                     {(() => {
                       const STANDARD_KEYS = [
-                        'case_title', 'case_number', 'plaintiff', 'defendant', 'court_name', 'judge_name',
-                        'attorney_name', 'firm_name', 'client_name', 'client_address', 'client_phone', 'client_email',
-                        'filing_date', 'hearing_date', 'firm_address', 'firm_phone', 'firm_zip', 'court_address', 'matter_number',
-                        'attorney_email'
+                        'case_title', 'case_number', 'plaintiff', 'defendant', 'court_name', 'court_county', 'court_department', 'court_dept', 'dept', 'department', 'judge_name',
+                        'attorney_name', 'bar_number', 'Atty Bar No', 'bar_no', 'attorney_for', 'firm_name', 'client_name', 'client_address', 'client_street', 'client_city', 'client_state', 'client_zip', 'client_city_state_zip', 'client_phone', 'client_email', 'party_role',
+                        'filing_date', 'hearing_date', 'hearing_time', 'firm_address', 'firm_phone', 'firm_zip', 'court_address', 'matter_number',
+                        'attorney_email', 'petitioner', 'respondent'
                       ];
                       const mappings = wizard?.template?.mappings || [];
                       const customFieldMappings = mappings.filter(
