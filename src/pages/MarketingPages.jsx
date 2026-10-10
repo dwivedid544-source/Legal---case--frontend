@@ -357,13 +357,16 @@ export function ReportsDashboard({ navigate, toast, openModal }) {
     toast(`Preparing PDF for ${r.title}...`, 'info');
     try {
       const res = await api.reports.download(r.id);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const rawBlob = res?.data || res;
+      const blob = rawBlob instanceof Blob ? rawBlob : new Blob([rawBlob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `report-${r.id}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       toast('Report downloaded successfully', 'success');
     } catch (e) {
       toast(e.message || 'Download failed', 'error');

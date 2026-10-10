@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Avatar, Modal } from './UI.jsx';
 import api from '../services/api';
 import TeamChatDrawer from './TeamChatDrawer';
+import LegalAIChatDrawer from './LegalAIChatDrawer';
 import { formatPSTDate } from '../utils/dateUtils';
 
 const ROLE_INFO = {
@@ -22,8 +23,49 @@ export default function Topbar({ sidebarOpen, onToggleSidebar, role, onLogout, o
   const [showProfile, setShowProfile] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [matters, setMatters] = useState([]);
+  const [activeMatterId, setActiveMatterId] = useState(null);
   const [notifs, setNotifs] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Load matters for Legal AI context selector
+  useEffect(() => {
+    const fetchMatters = async () => {
+      try {
+        const res = await api.matters.list({ limit: 100 });
+        if (res && res.data) {
+          setMatters(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch (err) {
+        console.warn('Could not load matter list for Legal AI context:', err);
+      }
+    };
+    fetchMatters();
+  }, []);
+
+  // Sync active matter from URL if currently on a matter/case detail page
+  useEffect(() => {
+    const match = window.location.pathname.match(/(?:matters|cases)\/(\d+)/);
+    if (match && match[1]) {
+      setActiveMatterId(match[1]);
+    }
+  }, []);
+
+  // Support opening Legal AI from anywhere via window event
+  useEffect(() => {
+    const handleOpenAI = (e) => {
+      if (e.detail?.matterId) {
+        setActiveMatterId(String(e.detail.matterId));
+      }
+      setShowAIChat(true);
+      setShowChat(false);
+      setShowNotifs(false);
+      setShowProfile(false);
+    };
+    window.addEventListener('vktori:open-legal-ai', handleOpenAI);
+    return () => window.removeEventListener('vktori:open-legal-ai', handleOpenAI);
+  }, []);
   
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -237,6 +279,33 @@ export default function Topbar({ sidebarOpen, onToggleSidebar, role, onLogout, o
       </div>
 
       <div className="flex items-center gap-3 ml-auto">
+        {/* Legal AI Specialist Button (LexisNexis & Claude Standards) */}
+        <button
+          onClick={() => {
+            setShowAIChat(!showAIChat);
+            setShowChat(false);
+            setShowNotifs(false);
+            setShowProfile(false);
+          }}
+          className={`h-11 px-3.5 flex flex-col items-center justify-center rounded-xl transition-all active:scale-95 relative group border ${
+            showAIChat
+              ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-amber-300 shadow-lg shadow-amber-500/25 font-bold'
+              : 'bg-white/10 hover:bg-white/20 text-white border-white/10 hover:border-amber-400/40'
+          }`}
+          title="VkTori Legal AI Assistant (LexisNexis & Claude Standards)"
+        >
+          <div className="relative leading-none flex items-center justify-center">
+            <svg className={`w-4.5 h-4.5 ${showAIChat ? 'text-slate-950' : 'text-amber-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+            </svg>
+            <span className="absolute -top-0.5 -right-1.5 w-2 h-2 bg-amber-400 rounded-full animate-ping" />
+            <span className="absolute -top-0.5 -right-1.5 w-2 h-2 bg-amber-400 rounded-full border border-[#0057c7]" />
+          </div>
+          <span className="text-[10px] font-extrabold tracking-tight mt-0.5 leading-none flex items-center gap-1">
+            Legal AI
+          </span>
+        </button>
+
         {/* Team Chat Button (Internal Firm Communication) */}
         <button
           onClick={() => { setShowChat(!showChat); setShowNotifs(false); setShowProfile(false); }}
@@ -364,6 +433,15 @@ export default function Topbar({ sidebarOpen, onToggleSidebar, role, onLogout, o
       {(showNotifs || showProfile) && (
         <div className="fixed inset-0 z-[65]" onClick={() => { setShowNotifs(false); setShowProfile(false); }} />
       )}
+
+      {/* Legal AI Specialist Drawer */}
+      <LegalAIChatDrawer
+        isOpen={showAIChat}
+        onClose={() => setShowAIChat(false)}
+        activeMatterId={activeMatterId}
+        matterList={matters}
+        onSelectMatter={(id) => setActiveMatterId(id)}
+      />
 
       {/* Internal Team Chat Drawer */}
       <TeamChatDrawer

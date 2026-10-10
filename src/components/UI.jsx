@@ -263,28 +263,100 @@ export function Field({ label, required, children }) {
 
 import { formatUSPhone } from '../utils/phoneUtils';
 
-export function Input({ className = '', value, type, onChange, ...props }) {
+export function Input({ className = '', value, type, onChange, onKeyDown, onPaste, ...props }) {
   const isPhone = type === 'tel' || (props.name && (
     props.name.includes('phone') || 
     props.name.includes('mobile') || 
     props.name.includes('fax')
   ));
 
+  const isPositiveNumber = type === 'number' && (props.min !== undefined && Number(props.min) >= 0);
+
   let normalizedValue = value !== undefined ? (value ?? '') : undefined;
   if (isPhone && typeof normalizedValue === 'string' && normalizedValue) {
     normalizedValue = formatUSPhone(normalizedValue);
   }
 
+  const handleKeyDown = (e) => {
+    if (isPositiveNumber) {
+      const isMinus = (
+        e.key === '-' ||
+        e.key === 'Subtract' ||
+        e.key === 'Minus' ||
+        e.code === 'Minus' ||
+        e.code === 'NumpadSubtract' ||
+        e.keyCode === 189 ||
+        e.keyCode === 109 ||
+        e.which === 189 ||
+        e.which === 109
+      );
+      const isExpOrPlus = (
+        e.key === '+' ||
+        e.key === 'Add' ||
+        e.code === 'NumpadAdd' ||
+        e.code === 'Equal' ||
+        e.keyCode === 107 ||
+        e.keyCode === 187 ||
+        e.key === 'e' ||
+        e.key === 'E'
+      );
+      if (isMinus || isExpOrPlus) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        const cur = parseFloat(e.target.value || '0');
+        if (isNaN(cur) || cur <= Number(props.min || 0)) {
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+    if (onKeyDown) onKeyDown(e);
+  };
+
+  const handlePaste = (e) => {
+    if (isPositiveNumber) {
+      const pasted = e.clipboardData.getData('text') || '';
+      if (pasted.includes('-') || pasted.includes('e') || pasted.includes('E') || pasted.includes('+')) {
+        e.preventDefault();
+        const sanitized = pasted.replace(/[^0-9.]/g, '');
+        e.target.value = sanitized;
+        if (onChange) onChange(e);
+        return;
+      }
+    }
+    if (onPaste) onPaste(e);
+  };
+
   const handleChange = (e) => {
     if (isPhone) {
       e.target.value = formatUSPhone(e.target.value);
+    }
+    if (isPositiveNumber && e.target.value) {
+      let val = String(e.target.value);
+      if (val.includes('-')) val = val.replace(/-/g, '');
+      if (val.includes('+')) val = val.replace(/\+/g, '');
+      if (Number(val) < 0) val = '0';
+      e.target.value = val;
     }
     if (onChange) {
       onChange(e);
     }
   };
 
-  return <input type={type} className={`form-input ${className}`} value={normalizedValue} onChange={handleChange} {...props} />;
+  return (
+    <input
+      type={type}
+      className={`form-input ${className}`}
+      value={normalizedValue}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      onWheel={type === 'number' ? (e) => e.target.blur() : props.onWheel}
+      {...props}
+    />
+  );
 }
 
 export function PhoneInput({ className = '', ...props }) {

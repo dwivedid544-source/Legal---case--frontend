@@ -936,7 +936,9 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                           { key: 'attorney_email', label: 'Attorney Email' },
                           { key: 'firm_name', label: 'Firm Name' },
                           { key: 'firm_phone', label: 'Firm Phone' },
-                          { key: 'firm_address', label: 'Firm Address', fullSpan: true },
+                          { key: 'firm_address', label: 'Firm Street Address', fullSpan: true },
+                          { key: 'firm_city', label: 'Firm City' },
+                          { key: 'firm_state', label: 'Firm State' },
                           { key: 'firm_zip', label: 'Firm Zip Code' },
                         ].map(({ key, label, fullSpan }) => (
                           <div key={key} style={{ gridColumn: fullSpan ? 'span 2' : 'auto' }}>
@@ -963,7 +965,8 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                           { key: 'court_county', label: 'Court County' },
                           { key: 'court_department', label: 'Court Department / Room' },
                           { key: 'judge_name', label: 'Presiding Judge' },
-                          { key: 'court_address', label: 'Court Address', fullSpan: true },
+                          { key: 'court_address', label: 'Court Street Address' },
+                          { key: 'court_city_zip', label: 'Court City & Zip' },
                           { key: 'hearing_date', label: 'Hearing Date', type: 'date' },
                           { key: 'hearing_time', label: 'Hearing Time' },
                         ].map(({ key, label, type, fullSpan }) => (
@@ -985,7 +988,7 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                       const STANDARD_KEYS = [
                         'case_title', 'case_number', 'plaintiff', 'defendant', 'court_name', 'court_county', 'court_department', 'court_dept', 'dept', 'department', 'judge_name',
                         'attorney_name', 'bar_number', 'Atty Bar No', 'bar_no', 'attorney_for', 'firm_name', 'client_name', 'client_address', 'client_street', 'client_city', 'client_state', 'client_zip', 'client_city_state_zip', 'client_phone', 'client_email', 'party_role',
-                        'filing_date', 'hearing_date', 'hearing_time', 'firm_address', 'firm_phone', 'firm_zip', 'court_address', 'matter_number',
+                        'filing_date', 'hearing_date', 'hearing_time', 'firm_address', 'firm_street', 'firm_city', 'firm_state', 'firm_phone', 'firm_zip', 'firm_city_state_zip', 'court_address', 'court_street', 'court_city_zip', 'matter_number',
                         'attorney_email', 'petitioner', 'respondent'
                       ];
                       const mappings = wizard?.template?.mappings || [];
@@ -1084,17 +1087,34 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
 
                 {/* Header Action Buttons */}
                 <div className="court-forms-preview-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* Print Button */}
+                  {/* Header Print & Download Buttons (Commented out to avoid duplication with action bar) */}
+                  {/*
                   <button
                     type="button"
                     onClick={() => {
-                      const iframe = document.getElementById('pdf-preview-iframe');
-                      if (iframe && iframe.contentWindow) {
-                        iframe.contentWindow.focus();
-                        iframe.contentWindow.print();
-                      } else {
-                        window.open(activeForm.url, '_blank');
-                      }
+                      if (!activeForm?.url) return;
+                      const printIframe = document.createElement('iframe');
+                      printIframe.style.position = 'fixed';
+                      printIframe.style.right = '0';
+                      printIframe.style.bottom = '0';
+                      printIframe.style.width = '0';
+                      printIframe.style.height = '0';
+                      printIframe.style.border = '0';
+                      printIframe.src = activeForm.url;
+                      document.body.appendChild(printIframe);
+                      printIframe.onload = () => {
+                        setTimeout(() => {
+                          try {
+                            printIframe.contentWindow.focus();
+                            printIframe.contentWindow.print();
+                          } catch (e) {
+                            window.open(activeForm.url, '_blank');
+                          }
+                          setTimeout(() => {
+                            try { document.body.removeChild(printIframe); } catch (_) {}
+                          }, 60000);
+                        }, 500);
+                      };
                     }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
@@ -1106,13 +1126,13 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     Print
                   </button>
 
-                  {/* Download Button */}
                   <button
                     type="button"
                     onClick={() => {
+                      if (!activeForm?.url) return;
                       const a = document.createElement('a');
                       a.href = activeForm.url;
-                      a.download = activeForm.filename;
+                      a.download = activeForm.filename || `${activeForm.formNumber || 'court'}_form.pdf`;
                       a.click();
                     }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', background: '#0057c7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}
@@ -1124,6 +1144,7 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                     </svg>
                     Download PDF
                   </button>
+                  */}
 
                   {/* Close Button */}
                   <button
@@ -1192,17 +1213,65 @@ export default function CourtFormsPage({ toast, role = 'admin' }) {
                   </div>
                 ) : (
                   <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    {/* Mobile Quick Open Bar */}
+                    {/* Mobile & Quick Open Bar */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: '#07152b', borderBottom: '1px solid rgba(56,189,248,0.2)', flexShrink: 0 }}>
                       <span style={{ fontSize: 12, color: '#38bdf8', fontWeight: 600 }}>📄 {activeForm.formNumber} PDF Ready</span>
-                      <a
-                        href={activeForm.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#0057c7', padding: '6px 14px', borderRadius: 8, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-                      >
-                        👁️ Open / View Full PDF
-                      </a>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {/*
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!activeForm?.url) return;
+                            const printIframe = document.createElement('iframe');
+                            printIframe.style.position = 'fixed';
+                            printIframe.style.right = '0';
+                            printIframe.style.bottom = '0';
+                            printIframe.style.width = '0';
+                            printIframe.style.height = '0';
+                            printIframe.style.border = '0';
+                            printIframe.src = activeForm.url;
+                            document.body.appendChild(printIframe);
+                            printIframe.onload = () => {
+                              setTimeout(() => {
+                                try {
+                                  printIframe.contentWindow.focus();
+                                  printIframe.contentWindow.print();
+                                } catch (e) {
+                                  window.open(activeForm.url, '_blank');
+                                }
+                                setTimeout(() => {
+                                  try { document.body.removeChild(printIframe); } catch (_) {}
+                                }, 60000);
+                              }, 500);
+                            };
+                          }}
+                          style={{ fontSize: 12, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          🖨️ Print
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!activeForm?.url) return;
+                            const a = document.createElement('a');
+                            a.href = activeForm.url;
+                            a.download = activeForm.filename || `${activeForm.formNumber || 'court'}_form.pdf`;
+                            a.click();
+                          }}
+                          style={{ fontSize: 12, fontWeight: 600, color: '#fff', background: '#0057c7', border: 'none', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          💾 Save / Download
+                        </button>
+                        */}
+                        <a
+                          href={activeForm.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#0284c7', padding: '6px 14px', borderRadius: 8, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          👁️ Open Full PDF
+                        </a>
+                      </div>
                     </div>
 
                     <object

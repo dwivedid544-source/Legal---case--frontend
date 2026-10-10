@@ -2787,17 +2787,25 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
       if (!uid) throw new Error('Not signed in.');
       const matter_id = parseInt(String(values.matterId || modalData?.matterId || ''), 10);
       if (!Number.isFinite(matter_id)) throw new Error('Select a matter.');
-      const invNum = `INV-${Date.now()}`;
+      const parsedAmount = parseFloat(values.amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        throw new Error('Please enter a valid positive invoice amount greater than $0.00.');
+      }
+      const invNum = (values.invoice_number && values.invoice_number.trim()) || `INV-${Date.now()}`;
+      let description = values.description || null;
+      if (values.memo && values.memo.trim()) {
+        description = description ? `${description}\n\n[Payment Terms & Memo]: ${values.memo.trim()}` : values.memo.trim();
+      }
       await api.billing.createInvoice({
         matter_id,
         invoice_number: invNum,
-        description: values.description || null,
-        amount: values.amount,
+        description,
+        amount: Math.abs(parsedAmount),
         due_date: values.dueDate ? new Date(values.dueDate).toISOString() : null,
-        status: 'draft',
+        status: values.status || 'due',
         created_by_user_id: uid,
       });
-      toast('Invoice created!', 'success');
+      toast('Invoice created successfully!', 'success');
       dispatchRefresh();
       break;
     }
@@ -3260,10 +3268,24 @@ async function defaultModalSubmit(type, modalData, values, { role, user, toast, 
         ? (values.custom_category || '').trim()
         : (values.category || 'General');
 
+      let contentToSave = values.content || '';
+      const isLetter = (catVal || '').toLowerCase() === 'letter' || (catVal || '').toLowerCase().includes('letter') || (catVal || '').toLowerCase() === 'demand letter';
+
+      if (isLetter && values.delivery_method) {
+        const meta = {
+          delivery_method: values.delivery_method,
+          delivery_email: values.delivery_email || '',
+          recipient_name: values.recipient_name || '',
+          recipient_address: values.recipient_address || '',
+        };
+        const stripped = contentToSave.replace(/<!--\s*LETTER_META:[\s\S]*?-->\s*/gi, '').trim();
+        contentToSave = `<!--LETTER_META:${JSON.stringify(meta)}-->\n${stripped}`;
+      }
+
       await api.drafts.update(draftId, {
         title: values.title,
         category: catVal,
-        content: values.content,
+        content: contentToSave,
       });
 
       toast('Draft updated successfully!', 'success');
@@ -4614,6 +4636,58 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       setVehiclesList([]);
       setAdaptiveQuestions({});
       setFormState({});
+    } else if (type === 'create-invoice') {
+      const initDueDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+      const initialMatterId = data?.matterId ? String(data.matterId) : '';
+      let initialAmt = '';
+      if (initialMatterId && Array.isArray(lookups?.invoices)) {
+        const mInvs = lookups.invoices.filter(i => String(i.matter_id || i.matter?.id) === String(initialMatterId));
+        let curOut = 0;
+        let curBill = 0;
+        for (const inv of mInvs) {
+          if (inv.status === 'void') continue;
+          const a = Number(inv.amount) || 0;
+          const p = Number(inv.paid_amount) || 0;
+          const d = Number(inv.due_amount !== undefined ? inv.due_amount : Math.max(0, a - p)) || 0;
+          curBill += a;
+          curOut += d;
+        }
+        const mObj = Array.isArray(lookups?.matters) ? lookups.matters.find(m => String(m.id) === String(initialMatterId)) : null;
+        const cv = Number(mObj?.case_value) || 0;
+        const sugg = curOut > 0 ? curOut : (curBill > 0 ? curBill : (cv > 0 ? cv : 0));
+        if (sugg > 0) initialAmt = String(sugg);
+      }
+      setFormState({
+        matterId: initialMatterId,
+        amount: initialAmt,
+        dueDate: initDueDate,
+        status: 'due',
+        invoice_number: `INV-${new Date().getFullYear()}-${initialMatterId ? String(initialMatterId).padStart(4, '0') : String(Math.floor(1000 + Math.random() * 9000))}`,
+        paymentTerms: 'Net 14',
+      });
+      if (initialMatterId) {
+        api.matters.get(initialMatterId).then(res => {
+          if (res?.data) {
+            const mData = res.data;
+            const invs = mData.invoices || [];
+            let cOut = 0;
+            let cBill = 0;
+            for (const inv of invs) {
+              if (inv.status === 'void') continue;
+              const a = Number(inv.amount) || 0;
+              const p = Number(inv.paid_amount) || 0;
+              const d = Number(inv.due_amount !== undefined ? inv.due_amount : Math.max(0, a - p)) || 0;
+              cBill += a;
+              cOut += d;
+            }
+            const val = Number(mData.case_value) || 0;
+            const freshSugg = cOut > 0 ? cOut : (cBill > 0 ? cBill : (val > 0 ? val : 0));
+            if (freshSugg > 0) {
+              setFormState(prev => ({ ...prev, amount: String(freshSugg) }));
+            }
+          }
+        }).catch(() => {});
+      }
     } else {
       setFormState({});
     }
@@ -4625,12 +4699,12 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
           .catch(() => {})
       );
     }
-    if (type === 'add-case' || type === 'edit-case') {
+    if (type === 'add-case' || type === 'edit-case' || type === 'create-invoice') {
       promises.push(
         api.customFields.list({ active: 'true' })
           .then(res => setCustomFields(res.data || []))
           .catch(() => {}),
-        api.clients.list()
+        api.clients.list({ limit: 500 })
           .then(res => setClientsList(res.data || []))
           .catch(() => {})
       );
@@ -4753,9 +4827,9 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       onSave: () => toast('Lead added successfully!', 'success'),
     },
     'add-client': {
-      title: 'Add New Client', wide: false,
+      title: 'Add New Client', wide: true,
       body: <>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <Field label="Client Type" required>
             <Select name="party_type" required defaultValue="Individual">
               <option value="Individual">Individual</option>
@@ -4786,22 +4860,22 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
         {formState.party_type === 'Organization' ? (
           <>
             <div className="mb-3"><Field label="Organization Name" required><Input name="organization_name" placeholder="Acme Corp" required /></Field></div>
-            <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <Field label="Contact First Name"><Input name="contact_first_name" placeholder="John" /></Field>
               <Field label="Contact Middle Name"><Input name="contact_middle_name" placeholder="E." /></Field>
               <Field label="Contact Last Name"><Input name="contact_last_name" placeholder="Doe" /></Field>
             </div>
           </>
         ) : (
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <Field label="First Name" required><Input name="firstName" placeholder="John" required /></Field>
             <Field label="Middle Name"><Input name="middleName" placeholder="Edward" /></Field>
             <Field label="Last Name" required><Input name="lastName" placeholder="Doe" required /></Field>
           </div>
         )}
 
-        <div className="mb-3"><Field label="Email Address" required><Input name="email" type="email" placeholder="john@example.com" required /></Field></div>
-        <div className="mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <Field label="Email Address" required><Input name="email" type="email" placeholder="john@example.com" required /></Field>
           <Field label="Phone">
             <Input
               name="phone"
@@ -4812,11 +4886,11 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
           </Field>
         </div>
         
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <Field label="Address Line 1"><Input name="address_line_1" placeholder="123 Main St" /></Field>
           <Field label="Address Line 2"><Input name="address_line_2" placeholder="Apt, Suite, Unit" /></Field>
         </div>
-        <div className="grid grid-cols-4 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
           <Field label="City"><Input name="city" placeholder="Los Angeles" /></Field>
           <Field label="State / Province"><Input name="state" placeholder="CA" /></Field>
           <Field label="Postal / ZIP Code"><Input name="postal_code" placeholder="90001" /></Field>
@@ -4826,7 +4900,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             </Select>
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <Field label="Date of Birth"><Input name="date_of_birth" type="date" /></Field>
           <Field label="Client Status">
             <Select name="status" defaultValue="active">
@@ -4835,6 +4909,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
               <option value="past">Past</option>
             </Select>
           </Field>
+          <Field label="Insurance Number"><Input name="insurance_number" placeholder="Policy or claim number" /></Field>
         </div>
         <div className="mb-3">
           <input type="hidden" name="government_id" value={formState.government_id || ''} />
@@ -4843,13 +4918,14 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             onChange={val => setFormState(s => ({ ...s, government_id: val }))}
           />
         </div>
-        <div className="mb-3"><Field label="Insurance Number"><Input name="insurance_number" placeholder="Policy or claim number" /></Field></div>
         
-        <div className="mb-3"><Field label="Opposing Party Name"><Input name="opposing_party_name" placeholder="Opposing Party Name" /></Field></div>
-        <div className="mb-3"><Field label="Opposing Law Firm & Contacts"><Input name="opposing_law_firm" placeholder="Firm Name / Phone / Email" /></Field></div>
-        <div className="mb-3"><Field label="Opposing Counsel"><Input name="opposing_counsel_name" placeholder="Attorney Name, Esq." /></Field></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          <Field label="Opposing Party Name"><Input name="opposing_party_name" placeholder="Opposing Party Name" /></Field>
+          <Field label="Opposing Law Firm & Contacts"><Input name="opposing_law_firm" placeholder="Firm Name / Phone / Email" /></Field>
+          <Field label="Opposing Counsel"><Input name="opposing_counsel_name" placeholder="Attorney Name, Esq." /></Field>
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
           <Field label="How did you hear about us?">
             <Select name="referral_source">
               <option value="">Select source...</option>
@@ -4869,7 +4945,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       onSave: () => toast('Client added successfully!', 'success'),
     },
     'edit-client': {
-      title: data ? `Edit Client: ${data.full_name || data.name || ''}` : 'Edit Client', wide: false,
+      title: data ? `Edit Client: ${data.full_name || data.name || ''}` : 'Edit Client', wide: true,
       body: (() => {
         const predefinedRoles = ['Client', 'Plaintiff', 'Defendant', 'Petitioner', 'Respondent', 'Claimant'];
         const isCustomRole = data?.party_role && !predefinedRoles.includes(data.party_role);
@@ -4878,7 +4954,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
 
         return (
           <>
-            <div className="grid grid-cols-2 gap-3 mb-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
               <Field label="Client Type" required>
                 <Select name="party_type" required defaultValue={data?.party_type || 'Individual'}>
                   <option value="Individual">Individual</option>
@@ -4909,22 +4985,22 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
             {(formState.party_type || data?.party_type) === 'Organization' ? (
               <>
                 <div className="mb-3"><Field label="Organization Name" required><Input name="organization_name" defaultValue={data?.organization_name || data?.full_name || ''} required /></Field></div>
-                <div className="grid grid-cols-3 gap-3 mb-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 items-end">
                   <Field label="Contact First Name"><Input name="contact_first_name" defaultValue={data?.contact_first_name || ''} /></Field>
                   <Field label="Contact Middle Name"><Input name="contact_middle_name" defaultValue={data?.contact_middle_name || ''} /></Field>
                   <Field label="Contact Last Name"><Input name="contact_last_name" defaultValue={data?.contact_last_name || ''} /></Field>
                 </div>
               </>
             ) : (
-              <div className="grid grid-cols-3 gap-3 mb-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 items-end">
                 <Field label="First Name" required><Input name="firstName" defaultValue={data?.first_name || (data?.full_name ? data.full_name.split(' ')[0] : '')} required /></Field>
                 <Field label="Middle Name"><Input name="middleName" defaultValue={data?.middle_name || (data?.full_name && data.full_name.split(' ').length > 2 ? data.full_name.split(' ').slice(1, -1).join(' ') : '')} /></Field>
-                <Field label="Last Name"><Input name="lastName" defaultValue={data?.last_name || (data?.full_name && data.full_name.split(' ').length > 1 ? data.full_name.split(' ').slice(-1).join(' ') : '')} /></Field>
+                <Field label="Last Name" required><Input name="lastName" defaultValue={data?.last_name || (data?.full_name && data.full_name.split(' ').length > 1 ? data.full_name.split(' ').slice(-1).join(' ') : '')} /></Field>
               </div>
             )}
 
-            <div className="mb-3"><Field label="Email Address"><Input name="email" defaultValue={data ? data.email : ''} placeholder="client@example.com" /></Field></div>
-            <div className="grid grid-cols-2 gap-3 mb-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
+              <Field label="Email Address"><Input name="email" defaultValue={data ? data.email : ''} placeholder="client@example.com" /></Field>
               <Field label="Phone">
                 <Input
                   name="phone"
@@ -4932,20 +5008,13 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
                   onChange={e => setFormState(s => ({ ...s, phone: formatUSPhone(e.target.value) }))}
                 />
               </Field>
-              <Field label="Status">
-                <Select name="status" defaultValue={data ? data.status || (data.is_portal_enabled === false ? 'past' : 'active') : 'active'}>
-                  <option value="active">Active</option>
-                  <option value="prospective">Prospective</option>
-                  <option value="past">Past</option>
-                </Select>
-              </Field>
             </div>
             
-            <div className="grid grid-cols-2 gap-3 mb-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
               <Field label="Address Line 1"><Input name="address_line_1" defaultValue={data?.address_line_1 || ''} placeholder="123 Main St" /></Field>
               <Field label="Address Line 2"><Input name="address_line_2" defaultValue={data?.address_line_2 || ''} placeholder="Apt, Suite, Unit" /></Field>
             </div>
-            <div className="grid grid-cols-4 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
               <Field label="City"><Input name="city" defaultValue={data?.city || ''} placeholder="Los Angeles" /></Field>
               <Field label="State / Province"><Input name="state" defaultValue={data?.state || ''} placeholder="CA" /></Field>
               <Field label="Postal / ZIP Code"><Input name="postal_code" defaultValue={data?.postal_code || ''} placeholder="90001" /></Field>
@@ -4955,23 +5024,32 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
                 </Select>
               </Field>
             </div>
-            <div className="grid grid-cols-1 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 items-end">
               <Field label="Date of Birth"><Input name="date_of_birth" type="date" defaultValue={data?.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : ''} /></Field>
-              <div>
-                <input type="hidden" name="government_id" value={formState.government_id !== undefined ? formState.government_id : (data?.government_id || '')} />
-                <ConfidentialIdFields
-                  value={formState.government_id !== undefined ? formState.government_id : (data?.government_id || '')}
-                  onChange={val => setFormState(s => ({ ...s, government_id: val }))}
-                />
-              </div>
+              <Field label="Status">
+                <Select name="status" defaultValue={data ? data.status || (data.is_portal_enabled === false ? 'past' : 'active') : 'active'}>
+                  <option value="active">Active</option>
+                  <option value="prospective">Prospective</option>
+                  <option value="past">Past</option>
+                </Select>
+              </Field>
+              <Field label="Insurance Number"><Input name="insurance_number" defaultValue={data?.insurance_number || ''} placeholder="Policy or claim number" /></Field>
             </div>
-            <div className="mb-3"><Field label="Insurance Number"><Input name="insurance_number" defaultValue={data?.insurance_number || ''} placeholder="Policy or claim number" /></Field></div>
+            <div className="mb-3">
+              <input type="hidden" name="government_id" value={formState.government_id !== undefined ? formState.government_id : (data?.government_id || '')} />
+              <ConfidentialIdFields
+                value={formState.government_id !== undefined ? formState.government_id : (data?.government_id || '')}
+                onChange={val => setFormState(s => ({ ...s, government_id: val }))}
+              />
+            </div>
             
-            <div className="mb-3"><Field label="Opposing Party Name"><Input name="opposing_party_name" defaultValue={data?.opposing_party_name || ''} placeholder="Opposing Party Name" /></Field></div>
-            <div className="mb-3"><Field label="Opposing Law Firm & Contacts"><Input name="opposing_law_firm" defaultValue={data?.opposing_law_firm || ''} placeholder="Firm Name / Phone / Email" /></Field></div>
-            <div className="mb-3"><Field label="Opposing Counsel"><Input name="opposing_counsel_name" defaultValue={data?.opposing_counsel_name || ''} placeholder="Attorney Name, Esq." /></Field></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <Field label="Opposing Party Name"><Input name="opposing_party_name" defaultValue={data?.opposing_party_name || ''} placeholder="Opposing Party Name" /></Field>
+              <Field label="Opposing Law Firm & Contacts"><Input name="opposing_law_firm" defaultValue={data?.opposing_law_firm || ''} placeholder="Firm Name / Phone / Email" /></Field>
+              <Field label="Opposing Counsel"><Input name="opposing_counsel_name" defaultValue={data?.opposing_counsel_name || ''} placeholder="Attorney Name, Esq." /></Field>
+            </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
               <Field label="How did you hear about us?">
                 <Select name="referral_source" defaultValue={data?.referral_source || ''}>
                   <option value="">Select source...</option>
@@ -7159,16 +7237,599 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       </>
     },
     'create-invoice': {
-      title: 'Create Invoice', wide: false,
-      body: <>
-        <div className="mb-3"><Field label="Matter" required><Select name="matterId" required defaultValue={data?.matterId || ''}><option value="">Select matter...</option>{matterRows.map((m) => <option key={m.id} value={m.id}>{m.matter_number} — {m.title}</option>)}</Select></Field></div>
-        <div className="mb-3"><Field label="Description" required><Textarea name="description" rows={2} placeholder="Services rendered..." required /></Field></div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Amount ($)" required><Input name="amount" type="number" min="0" step="0.01" placeholder="0.00" required /></Field>
-          <Field label="Due Date" required><Input name="dueDate" type="date" required /></Field>
-        </div>
-      </>,
-      onSave: () => toast('Invoice created!', 'success'),
+      title: 'Create Professional Invoice', wide: true,
+      body: (() => {
+        if (type !== 'create-invoice') return null;
+        const selectedMatterId = formState.matterId !== undefined ? formState.matterId : (data?.matterId || '');
+        const selectedMatter = matterRows.find(m => String(m.id) === String(selectedMatterId));
+        
+        const lookupClient = selectedMatter
+          ? clientRows.find(c => String(c.id) === String(selectedMatter.client_id || selectedMatter.client?.id))
+          : null;
+        const matterClient = selectedMatter?.client || selectedMatter?.retaining_client;
+        const partyClient = Array.isArray(selectedMatter?.parties_data)
+          ? selectedMatter.parties_data.find(p => p.is_retaining_client || p.party_role === 'Client' || p.party_role === 'Retaining Client')
+          : null;
+
+        const selectedClient = (lookupClient || matterClient || partyClient)
+          ? {
+              ...(partyClient || {}),
+              ...(matterClient || {}),
+              ...(lookupClient || {}),
+            }
+          : null;
+
+        const defaultDueDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+        const todayDate = new Date().toISOString().split('T')[0];
+        const net14Date = defaultDueDate;
+        const net30Date = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+        const net60Date = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
+
+        const clientAddress = selectedClient
+          ? [
+              selectedClient.address_line_1,
+              selectedClient.address_line_2,
+              [selectedClient.city, selectedClient.state].filter(Boolean).join(', '),
+              selectedClient.postal_code,
+              selectedClient.country && selectedClient.country !== 'United States' ? selectedClient.country : null
+            ].filter(Boolean).join(', ') || selectedClient.home_address || selectedClient.business_address || selectedClient.address || 'No billing address on file'
+          : '—';
+
+        const clientEmail = selectedClient?.email || 'No email on file';
+        const clientPhone = selectedClient?.phone || 'No phone on file';
+        const clientRole = selectedClient?.party_role || 'Primary Client';
+        const clientType = selectedClient?.party_type || 'Individual';
+        const clientCode = selectedClient?.id 
+          ? `CL-${String(selectedClient.id).padStart(4, '0')}` 
+          : (selectedMatter?.client_id ? `CL-${String(selectedMatter.client_id).padStart(4, '0')}` : '—');
+        const clientName = selectedClient?.full_name || selectedClient?.name || 'Valued Client';
+        const clientOrg = selectedClient?.organization_name || null;
+        const isPortalActive = Boolean(selectedClient?.is_portal_enabled);
+
+        const defaultInvoiceNum = selectedMatter 
+          ? `INV-${new Date().getFullYear()}-${String(selectedMatter.id).padStart(4, '0')}`
+          : `INV-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`;
+
+        // Matter Financial Calculations
+        const matterInvoices = (lookups?.invoices || []).filter(
+          inv => String(inv.matter_id || inv.matter?.id) === String(selectedMatterId)
+        );
+        let mTotalBilled = 0;
+        let mPaid = 0;
+        let mOutstanding = 0;
+        for (const inv of matterInvoices) {
+          if (inv.status === 'void') continue;
+          const a = Number(inv.amount) || 0;
+          const p = Number(inv.paid_amount) || (inv.payments || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+          const d = Number(inv.due_amount !== undefined ? inv.due_amount : Math.max(0, a - p)) || 0;
+          mTotalBilled += a;
+          mPaid += p;
+          mOutstanding += d;
+        }
+        const mCaseValue = Number(selectedMatter?.case_value) || 0;
+        const autoDetectedAmount = mOutstanding > 0 
+          ? mOutstanding 
+          : (mTotalBilled > 0 ? mTotalBilled : (mCaseValue > 0 ? mCaseValue : 0));
+
+        const feePresetTemplates = [
+          { label: 'Flat Fee Representation', desc: 'Flat fee agreement for comprehensive legal representation, case filings, and attorney proceedings.' },
+          { label: 'Hourly Services', desc: 'Hourly legal services rendered, pleadings drafting, evidentiary review, and client conferences.' },
+          { label: 'Retainer Replenishment', desc: 'Trust retainer replenishment pursuant to the attorney-client legal services agreement.' },
+          { label: 'Court Filing Reimbursement', desc: 'Disbursement reimbursement for court filing fees, process service, and official docket charges.' },
+        ];
+
+        return (
+          <div className="space-y-6">
+            {/* Top Grid: Matter Selector & Invoice Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+              <div className="sm:col-span-8">
+                <Field label="Matter / Case File" required>
+                  <Select
+                    name="matterId"
+                    required
+                    value={selectedMatterId}
+                    onChange={(e) => {
+                      const newMatterId = e.target.value;
+                      const mInvs = (lookups?.invoices || []).filter(
+                        inv => String(inv.matter_id || inv.matter?.id) === String(newMatterId)
+                      );
+                      let nTotalBilled = 0;
+                      let nOutstanding = 0;
+                      for (const inv of mInvs) {
+                        if (inv.status === 'void') continue;
+                        const a = Number(inv.amount) || 0;
+                        const p = Number(inv.paid_amount) || (inv.payments || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+                        const d = Number(inv.due_amount !== undefined ? inv.due_amount : Math.max(0, a - p)) || 0;
+                        nTotalBilled += a;
+                        nOutstanding += d;
+                      }
+                      const mObj = matterRows.find(m => String(m.id) === String(newMatterId));
+                      const nCaseVal = Number(mObj?.case_value) || 0;
+                      const suggestedVal = nOutstanding > 0 ? nOutstanding : (nTotalBilled > 0 ? nTotalBilled : (nCaseVal > 0 ? nCaseVal : 0));
+
+                      setFormState(prev => ({
+                        ...prev,
+                        matterId: newMatterId,
+                        amount: suggestedVal > 0 ? String(suggestedVal) : (prev.amount || ''),
+                        invoice_number: mObj ? `INV-${new Date().getFullYear()}-${String(mObj.id).padStart(4, '0')}` : prev.invoice_number,
+                      }));
+
+                      if (newMatterId) {
+                        api.matters.get(newMatterId).then(res => {
+                          if (res?.data) {
+                            const mData = res.data;
+                            const invs = mData.invoices || [];
+                            let curOutstanding = 0;
+                            let curBilled = 0;
+                            for (const inv of invs) {
+                              if (inv.status === 'void') continue;
+                              const a = Number(inv.amount) || 0;
+                              const p = Number(inv.paid_amount) || (inv.payments || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+                              const d = Number(inv.due_amount !== undefined ? inv.due_amount : Math.max(0, a - p)) || 0;
+                              curBilled += a;
+                              curOutstanding += d;
+                            }
+                            const val = Number(mData.case_value) || 0;
+                            const freshSuggested = curOutstanding > 0 ? curOutstanding : (curBilled > 0 ? curBilled : (val > 0 ? val : 0));
+                            if (freshSuggested > 0) {
+                              setFormState(prev => ({
+                                ...prev,
+                                amount: String(freshSuggested),
+                              }));
+                            }
+                          }
+                        }).catch(() => {});
+                      }
+                    }}
+                  >
+                    <option value="">Select matter / case file...</option>
+                    {matterRows.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.matter_number} — {m.title} {m.client?.full_name ? `(${m.client.full_name})` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+              <div className="sm:col-span-4">
+                <Field label="Invoice Visibility / Status" required>
+                  <Select
+                    name="status"
+                    value={formState.status || 'due'}
+                    onChange={e => setFormState(s => ({ ...s, status: e.target.value }))}
+                    required
+                  >
+                    <option value="due">Issued &amp; Awaiting Payment (Live on Portal)</option>
+                    <option value="draft">Internal Draft (Firm Only - Hidden from Client)</option>
+                  </Select>
+                </Field>
+              </div>
+            </div>
+
+            {/* Dynamic Auto-Populated Client Information Card */}
+            {selectedMatter && selectedClient ? (
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0057c7]/15 via-white/[0.04] to-white/[0.01] border border-[#0057c7]/40 shadow-2xl space-y-4 animate-fade-in relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#0057c7]/10 blur-3xl pointer-events-none" />
+
+                {/* Card Header */}
+                <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-3 relative z-10">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-[#0057c7]/20 border border-[#0057c7]/40 text-[#38bdf8] flex items-center justify-center font-bold text-lg shadow-inner">
+                      {clientName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'CL'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-900 text-[#38bdf8] uppercase tracking-[0.2em]">Billed To Entity (Auto-Populated)</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#0057c7]/20 text-[#7dd3fc] border border-[#0057c7]/40 font-bold">
+                          {clientCode}
+                        </span>
+                      </div>
+                      <h4 className="text-[17px] font-900 text-white tracking-tight flex items-center gap-2 mt-0.5">
+                        {clientName}
+                        {clientOrg && (
+                          <span className="text-xs px-2.5 py-0.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 font-semibold">
+                            🏢 {clientOrg}
+                          </span>
+                        )}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-800 px-3 py-1 rounded-xl uppercase tracking-wider border shadow-sm flex items-center gap-1.5 ${
+                      isPortalActive
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${isPortalActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                      {isPortalActive ? 'Portal Access Active · Instant Delivery' : 'Offline Client · PDF Only'}
+                    </span>
+                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-xl bg-white/5 text-slate-300 border border-white/10">
+                      Role: <strong className="text-white">{clientRole}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Client Contact & Billing Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs relative z-10">
+                  <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 hover:border-[#0057c7]/30 transition-colors">
+                    <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                      Email Identity
+                    </p>
+                    <p className="text-white font-medium truncate" title={clientEmail}>{clientEmail}</p>
+                    <span className="text-[9px] text-[#38bdf8]/80 font-semibold block">Verified Contact</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 hover:border-[#0057c7]/30 transition-colors">
+                    <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                      Phone Channel
+                    </p>
+                    <p className="text-white font-medium truncate">{clientPhone}</p>
+                    <span className="text-[9px] text-slate-400 font-semibold block">Direct Telephone</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 hover:border-[#0057c7]/30 transition-colors">
+                    <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                      Legal Billing Address
+                    </p>
+                    <p className="text-white font-medium truncate" title={clientAddress}>{clientAddress}</p>
+                    <span className="text-[9px] text-slate-400 font-semibold block">Official Location</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 hover:border-[#0057c7]/30 transition-colors">
+                    <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      Matter Billing Total
+                    </p>
+                    <p className="text-emerald-400 font-bold truncate">
+                      ${autoDetectedAmount > 0 ? autoDetectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (mCaseValue > 0 ? mCaseValue.toLocaleString('en-US') : '0.00')}
+                    </p>
+                    <span className="text-[9px] text-slate-400 font-semibold block truncate">
+                      {mOutstanding > 0 ? 'Outstanding Arrears' : (mTotalBilled > 0 ? 'Total Prior Invoices' : 'Case Value')}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 hover:border-[#0057c7]/30 transition-colors">
+                    <p className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                      Case / Matter Link
+                    </p>
+                    <p className="text-white font-bold truncate">{selectedMatter.matter_number}</p>
+                    <span className="text-[9px] text-[#38bdf8] font-bold block truncate">{selectedMatter.practice_area || 'General Legal Practice'}</span>
+                  </div>
+                </div>
+
+                {/* Bottom Bar: Docket & Attorney Info */}
+                <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] text-[#8a94a6] pt-2 px-1 border-t border-white/10 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <span>Title: <strong className="text-white font-medium">{selectedMatter.title}</strong></span>
+                    {(selectedMatter.case_number || selectedMatter.claim_number) && (
+                      <span>· Docket / Claim: <strong className="text-sky-300 font-mono">{selectedMatter.case_number || selectedMatter.claim_number}</strong></span>
+                    )}
+                  </div>
+                  <span className="text-slate-400">
+                    Lead Counsel: <strong className="text-slate-200">{selectedMatter.assigned_lawyer?.full_name || 'Victoria Tulsidas, Esq.'}</strong>
+                  </span>
+                </div>
+              </div>
+            ) : selectedMatter ? (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center gap-3 animate-fade-in">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <strong className="block text-amber-200">Matter Selected: {selectedMatter.matter_number} — {selectedMatter.title}</strong>
+                  <span>No primary retaining client profile was resolved directly. The invoice will be recorded under this case file.</span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 rounded-2xl bg-gradient-to-b from-white/[0.03] to-white/[0.01] border-2 border-dashed border-white/10 text-center space-y-2 animate-fade-in">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-[#38bdf8] flex items-center justify-center mx-auto text-xl shadow-inner">
+                  ⚖️
+                </div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Select a Matter to Auto-Populate Client Information</h4>
+                <p className="text-xs text-[#8a94a6] max-w-md mx-auto">
+                  Once a matter or case file is selected above, complete client records (Name, Organization, Email, Phone, Verified Billing Address, and Portal Status) will load here automatically.
+                </p>
+              </div>
+            )}
+
+            {/* Auto-populated Amount Assist Strip */}
+            {selectedMatter && autoDetectedAmount > 0 && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#0057c7]/20 via-[#0057c7]/10 to-white/[0.02] border border-[#0057c7]/40 flex items-center justify-between flex-wrap gap-3 animate-fade-in text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#0057c7]/20 border border-[#0057c7]/40 text-[#38bdf8] flex items-center justify-center font-bold text-sm">
+                    💵
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[#38bdf8] font-900 uppercase tracking-wider">Auto-Calculated Matter Billing Total</span>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                        mOutstanding > 0 
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/25' 
+                          : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                      }`}>
+                        {mOutstanding > 0 ? '● Outstanding Arrears' : '● Total Matter Invoicing'}
+                      </span>
+                    </div>
+                    <span className="font-extrabold text-white text-base font-mono">
+                      ${autoDetectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormState(s => ({ ...s, amount: String(Math.max(0, autoDetectedAmount)) }))}
+                    className="text-[11px] font-bold text-white bg-[#0057c7] hover:bg-[#004bb1] px-3.5 py-1.5 rounded-xl transition-all shadow-md flex items-center gap-1.5"
+                  >
+                    <span>Auto-Fill Total (${autoDetectedAmount.toLocaleString('en-US')})</span>
+                  </button>
+                  {mCaseValue > 0 && mCaseValue !== autoDetectedAmount && (
+                    <button
+                      type="button"
+                      onClick={() => setFormState(s => ({ ...s, amount: String(Math.max(0, mCaseValue)) }))}
+                      className="text-[11px] font-semibold text-slate-300 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 transition-all"
+                    >
+                      Case Value (${mCaseValue.toLocaleString('en-US')})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Invoice Configuration Row: Invoice Number, Statement Date, Payment Terms */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Invoice Number / Serial #" required>
+                <Input
+                  name="invoice_number"
+                  value={formState.invoice_number !== undefined ? formState.invoice_number : defaultInvoiceNum}
+                  onChange={e => setFormState(s => ({ ...s, invoice_number: e.target.value }))}
+                  placeholder="INV-2026-0001"
+                  required
+                />
+              </Field>
+
+              <Field label="Statement / Issue Date" required>
+                <Input
+                  name="issuedDate"
+                  type="date"
+                  defaultValue={todayDate}
+                  required
+                />
+              </Field>
+
+              <Field label="Payment Terms Preset">
+                <Select
+                  value={formState.paymentTerms || 'Net 14'}
+                  onChange={e => {
+                    const term = e.target.value;
+                    let targetDate = defaultDueDate;
+                    if (term === 'Due Upon Receipt') targetDate = todayDate;
+                    else if (term === 'Net 14') targetDate = net14Date;
+                    else if (term === 'Net 30') targetDate = net30Date;
+                    else if (term === 'Net 60') targetDate = net60Date;
+                    setFormState(s => ({ ...s, paymentTerms: term, dueDate: targetDate }));
+                  }}
+                >
+                  <option value="Due Upon Receipt">Due Upon Receipt (Immediate)</option>
+                  <option value="Net 14">Net 14 Days</option>
+                  <option value="Net 30">Net 30 Days</option>
+                  <option value="Net 60">Net 60 Days</option>
+                  <option value="Custom">Custom Date</option>
+                </Select>
+              </Field>
+            </div>
+
+            {/* Financial Valuation & Due Date with Presets */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Total Invoice Amount ($)" required>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base pointer-events-none">$</span>
+                  <Input
+                    name="amount"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    className="pl-8 text-base font-bold text-white tracking-wide"
+                    value={formState.amount !== undefined ? formState.amount : ''}
+                    onKeyDown={e => {
+                      const isMinus = (
+                        e.key === '-' ||
+                        e.key === 'Subtract' ||
+                        e.key === 'Minus' ||
+                        e.code === 'Minus' ||
+                        e.code === 'NumpadSubtract' ||
+                        e.keyCode === 189 ||
+                        e.keyCode === 109 ||
+                        e.which === 189 ||
+                        e.which === 109
+                      );
+                      const isExponentOrPlus = (
+                        e.key === '+' ||
+                        e.key === 'Add' ||
+                        e.code === 'NumpadAdd' ||
+                        e.code === 'Equal' ||
+                        e.keyCode === 107 ||
+                        e.keyCode === 187 ||
+                        e.key === 'e' ||
+                        e.key === 'E'
+                      );
+                      if (isMinus || isExponentOrPlus) {
+                        e.preventDefault();
+                        return;
+                      }
+                      if (e.key === 'ArrowDown') {
+                        const cur = parseFloat(formState.amount || '0');
+                        if (isNaN(cur) || cur <= 0) {
+                          e.preventDefault();
+                          return;
+                        }
+                      }
+                    }}
+                    onPaste={e => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text') || '';
+                      let cleaned = pasted.replace(/[^0-9.]/g, '');
+                      const parts = cleaned.split('.');
+                      if (parts.length > 2) {
+                        cleaned = parts[0] + '.' + parts.slice(1).join('');
+                      }
+                      setFormState(s => ({ ...s, amount: cleaned }));
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                    }}
+                    onChange={e => {
+                      let raw = e.target.value;
+                      let cleaned = raw.replace(/[^0-9.]/g, '');
+                      const parts = cleaned.split('.');
+                      if (parts.length > 2) {
+                        cleaned = parts[0] + '.' + parts.slice(1).join('');
+                      }
+                      setFormState(s => ({ ...s, amount: cleaned }));
+                    }}
+                    required
+                  />
+                </div>
+              </Field>
+
+              <Field label="Payment Due Date" required>
+                <Input
+                  name="dueDate"
+                  type="date"
+                  value={formState.dueDate !== undefined ? formState.dueDate : defaultDueDate}
+                  onChange={e => setFormState(s => ({ ...s, dueDate: e.target.value, paymentTerms: 'Custom' }))}
+                  required
+                />
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <span className="text-[10px] text-[#8a94a6] uppercase font-bold tracking-wider">Quick Select:</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormState(s => ({ ...s, dueDate: todayDate, paymentTerms: 'Due Upon Receipt' }))}
+                    className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-all border ${
+                      formState.dueDate === todayDate
+                        ? 'bg-[#0057c7] text-white border-[#0057c7]'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormState(s => ({ ...s, dueDate: net14Date, paymentTerms: 'Net 14' }))}
+                    className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-all border ${
+                      formState.dueDate === net14Date
+                        ? 'bg-[#0057c7] text-white border-[#0057c7]'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                    }`}
+                  >
+                    Net 14
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormState(s => ({ ...s, dueDate: net30Date, paymentTerms: 'Net 30' }))}
+                    className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-all border ${
+                      formState.dueDate === net30Date
+                        ? 'bg-[#0057c7] text-white border-[#0057c7]'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                    }`}
+                  >
+                    Net 30
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormState(s => ({ ...s, dueDate: net60Date, paymentTerms: 'Net 60' }))}
+                    className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-all border ${
+                      formState.dueDate === net60Date
+                        ? 'bg-[#0057c7] text-white border-[#0057c7]'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                    }`}
+                  >
+                    Net 60
+                  </button>
+                </div>
+              </Field>
+            </div>
+
+            {/* Quick Fee Classification Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-800 text-[#8a94a6] uppercase tracking-wider">Fee Classification & Narrative Presets</span>
+              <div className="flex flex-wrap gap-2">
+                {feePresetTemplates.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setFormState(s => ({
+                        ...s,
+                        description: s.description ? `${s.description}\n${preset.desc}` : preset.desc
+                      }));
+                    }}
+                    className="text-[11px] px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-[#0057c7]/20 hover:text-[#38bdf8] hover:border-[#0057c7]/40 text-slate-300 font-medium transition-all border border-white/10 flex items-center gap-1.5"
+                  >
+                    <span>+</span> {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Services Description Narrative */}
+            <Field label="Services Narrative & Itemization" required>
+              <Textarea
+                name="description"
+                rows={3}
+                value={formState.description !== undefined ? formState.description : ''}
+                onChange={e => setFormState(s => ({ ...s, description: e.target.value }))}
+                placeholder="Comprehensive description of legal services rendered, case filings, discovery review, or retainer fee..."
+                required
+              />
+            </Field>
+
+            {/* Payment Remittance Memo & Client Instructions */}
+            <Field label="Payment Terms & Remittance Instructions">
+              <Input
+                name="memo"
+                defaultValue="Payment is due upon agreed terms. Remit online via the secure client portal or by check payable to VkTori Law Firm Trust Account."
+                placeholder="E.g., Payment due upon receipt. Remit via secure portal or check payable to firm."
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                These instructions will appear on the client billing statement and PDF statement header.
+              </span>
+            </Field>
+
+            {/* Executive Live Summary Bar */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0057c7]/15 via-white/[0.02] to-white/[0.01] border border-white/10 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-4 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Client Recipient</span>
+                  <span className="text-white font-bold">{clientName}</span>
+                </div>
+                <div className="h-6 w-px bg-white/10 hidden sm:block" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Matter File</span>
+                  <span className="text-sky-300 font-mono font-bold">{selectedMatter ? selectedMatter.matter_number : 'None'}</span>
+                </div>
+                <div className="h-6 w-px bg-white/10 hidden sm:block" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Due Date</span>
+                  <span className="text-slate-200 font-semibold">{formState.dueDate || defaultDueDate}</span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Statement Total</span>
+                <span className="text-xl font-900 text-emerald-400 tracking-tight">
+                  ${Number(formState.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })(),
+      onSave: null,
     },
     'add-expense': {
       title: 'Record Firm Expense', wide: false,
@@ -7725,8 +8386,9 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     'edit-user': {
       title: data ? `Edit User: ${data.name}` : 'Edit User', wide: false,
       body: (() => {
+        if (type !== 'edit-user') return null;
         const predefinedSpecialties = ['Civil Litigation', 'Family Law', 'Corporate', 'Real Estate'];
-        const isCustomSpecialty = data?.practice_focus && !predefinedSpecialties.includes(data.practice_focus);
+        const isCustomSpecialty = typeof data?.practice_focus === 'string' && !predefinedSpecialties.includes(data.practice_focus);
         const defaultSelectValue = isCustomSpecialty ? 'other' : (data?.practice_focus || '');
         const showCustomField = (formState.specialty || defaultSelectValue) === 'other';
 
@@ -8067,7 +8729,7 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
       onSave: () => toast('Communication logged successfully!', 'success'),
     },
     'view-report': {
-      title: data?.title || 'Report Overview', wide: false,
+      title: data?.title || 'Report Overview', wide: true,
       body: data?.content || <p>No content available.</p>,
       onSave: () => { },
     },
@@ -8137,13 +8799,14 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     'edit-template': {
       title: data ? `Edit Template: ${data.title}` : 'Edit Template', wide: true,
       body: (() => {
+        if (type !== 'edit-template') return null;
         const predefinedCats = ['agreement', 'court_form', 'letter', 'contract', 'motion', 'pleading', 'affidavit', 'notice', 'demand_letter', 'legal_disclaimer'];
-        const isCustomCat = data?.category && !predefinedCats.includes(data.category.toLowerCase());
+        const isCustomCat = typeof data?.category === 'string' && !predefinedCats.includes(data.category.toLowerCase());
         const defaultCatVal = isCustomCat ? 'other' : (data?.category || 'agreement');
         const showCustomCat = (formState.category || defaultCatVal) === 'other';
 
         const predefinedPAs = ['Civil Litigation', 'Family Law', 'Corporate'];
-        const isCustomPA = data?.practice_area && !predefinedPAs.includes(data.practice_area);
+        const isCustomPA = typeof data?.practice_area === 'string' && !predefinedPAs.includes(data.practice_area);
         const defaultPAVal = isCustomPA ? 'other' : (data?.practice_area || '');
         const showCustomPA = (formState.practice_area || defaultPAVal) === 'other';
 
@@ -8209,10 +8872,22 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     'edit-draft': {
       title: data ? `Edit Draft: ${data.title}` : 'Edit Draft', wide: true,
       body: (() => {
+        if (type !== 'edit-draft') return null;
         const predefinedDraftCats = ['Agreement','Engagement','Intake','Litigation','Resolution','General','court_form','letter','contract','motion','pleading','affidavit','notice','demand_letter','legal_disclaimer'];
-        const isCustomDraftCat = data?.category && !predefinedDraftCats.includes(data.category);
+        const isCustomDraftCat = typeof data?.category === 'string' && !predefinedDraftCats.includes(data.category);
         const defaultDraftCatVal = isCustomDraftCat ? 'other' : (data?.category || 'General');
         const showCustomDraftCat = (formState.category || defaultDraftCatVal) === 'other';
+
+        const draftContentStr = typeof data?.content === 'string' ? data.content : '';
+        const metaMatch = draftContentStr.match(/<!--\s*LETTER_META:\s*({[\s\S]*?})\s*-->/i);
+        let existingMeta = {};
+        if (metaMatch) {
+          try { existingMeta = JSON.parse(metaMatch[1]); } catch (e) {}
+        }
+        const cleanContent = draftContentStr.replace(/<!--\s*LETTER_META:[\s\S]*?-->\s*/gi, '').trim();
+        const currentCategory = (formState.category || defaultDraftCatVal || '').toLowerCase();
+        const isLetter = currentCategory === 'letter' || currentCategory === 'demand_letter' || currentCategory === 'demand letter' || currentCategory.includes('letter');
+
         return (
           <>
             <div className="mb-3"><Field label="Draft Title" required><Input name="title" defaultValue={data?.title} required /></Field></div>
@@ -8245,7 +8920,40 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
                 </Field>
               </div>
             )}
-            <Field label="Draft Content" required><Textarea name="content" rows={12} defaultValue={data?.content} required /></Field>
+
+            {isLetter && (
+              <div className="space-y-3 mb-4 p-4 rounded-2xl border border-[#0057c7]/30 bg-[#0057c7]/[0.04]">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-[12px] font-800 text-[#38bdf8] uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📬</span> Transmission / Delivery Method (Top Indicator)
+                  </label>
+                  <span className="text-[10px] font-800 px-2.5 py-0.5 rounded-lg bg-black/60 text-amber-300 border border-amber-400/20 uppercase tracking-widest font-mono">
+                    ✓ Top Header Indicator
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Delivery Method">
+                    <Select name="delivery_method" defaultValue={existingMeta.delivery_method || 'email'}>
+                      <option value="email">Via Email Correspondence</option>
+                      <option value="us_mail">Via U.S. Mail</option>
+                      <option value="certified_mail">Via Certified Mail (RRR)</option>
+                      <option value="courier">Via Overnight Courier</option>
+                    </Select>
+                  </Field>
+                  <Field label="Transmission Email (if email)">
+                    <Input name="delivery_email" defaultValue={existingMeta.delivery_email || ''} placeholder="recipient@example.com" />
+                  </Field>
+                  <Field label="Recipient Full Name">
+                    <Input name="recipient_name" defaultValue={existingMeta.recipient_name || ''} placeholder="e.g. John Doe" />
+                  </Field>
+                  <Field label="Recipient Address (City, State, Zip)">
+                    <Input name="recipient_address" defaultValue={existingMeta.recipient_address || ''} placeholder="123 Ocean Blvd, Santa Monica, CA 90401" />
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            <Field label="Draft Content" required><Textarea name="content" rows={12} defaultValue={cleanContent || data?.content} required /></Field>
           </>
         );
       })(),
@@ -8330,11 +9038,12 @@ function AppModal({ type, data, onClose, toast, onSave, navigate, role, user, lo
     type === 'compose-email' ? 'Send Email'
       : type === 'add-document' ? (isUploadingQueue ? 'Done' : 'Upload')
         : type === 'view-invoice' ? 'Acknowledge'
-          : type === 'view-event' ? 'Acknowledge'
-            : type === 'browse-templates' ? 'Close'
-              : 'Save';
+          : type === 'view-report' ? 'Close'
+            : type === 'view-event' ? 'Acknowledge'
+              : type === 'browse-templates' ? 'Close'
+                : 'Save';
   const handlePrimary = async () => {
-    if (type === 'view-invoice') {
+    if (type === 'view-invoice' || type === 'view-report') {
       onClose();
       return;
     }

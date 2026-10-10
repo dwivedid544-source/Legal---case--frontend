@@ -65,7 +65,13 @@ async function request(endpoint, options = {}) {
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
-    if (options.responseType === 'blob') {
+    const contentType = response.headers.get('content-type') || '';
+    const isBinary = options.responseType === 'blob' || 
+      contentType.includes('application/pdf') || 
+      contentType.includes('application/octet-stream') || 
+      contentType.includes('application/zip');
+
+    if (isBinary) {
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || 'Download failed');
@@ -442,7 +448,7 @@ export const searchAPI = {
   global: (q) => request(`/search?q=${encodeURIComponent(q)}`),
 };
 
-export default {
+const api = {
   request,
   auth: authAPI,
   search: searchAPI,
@@ -578,7 +584,7 @@ export default {
     getMarketing: () => request('/reports/marketing'),
     getReferrals: () => request('/reports/referrals'),
     getById: (id) => request(`/reports/${id}`),
-    download: (id) => request(`/reports/${id}/download`),
+    download: (id) => request(`/reports/${id}/download`, { responseType: 'blob' }),
   },
   esign: {
     createRequest: (data) => request('/esign/requests', { method: 'POST', body: data }),
@@ -592,6 +598,13 @@ export default {
   courtEFiling: {
     submitFiling: (data) => request('/court-efiling/submit', { method: 'POST', body: data }),
     getSubmissions: (params) => request(`/court-efiling/submissions${buildQuery(params)}`),
+  },
+  ai: {
+    chat: (payload) => request('/ai/chat', { method: 'POST', body: payload }),
+    getStatus: () => request('/ai/status'),
+    getContext: (matterId) => request(`/ai/context/${matterId}`),
   }
 };
 
+export { api };
+export default api;

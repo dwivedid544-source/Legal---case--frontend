@@ -4039,7 +4039,7 @@ export function MatterTasksTab({ caseId, apiMatter, toast }) {
 // ─────────────────────────────────────────────────────────
 // ENTERPRISE COMMUNICATION LOG MODULE COMPONENT
 // ─────────────────────────────────────────────────────────
-export function MatterCommunicationsTab({ caseId, apiMatter, toast }) {
+export function MatterCommunicationsTab({ caseId, apiMatter, toast, matterRefreshTick = 0 }) {
   const [comms, setComms] = useState([]);
   const [stats, setStats] = useState({ total: 0, calls: 0, emails: 0, sms: 0, meetings: 0, notes: 0 });
   const [loading, setLoading] = useState(true);
@@ -4105,7 +4105,7 @@ export function MatterCommunicationsTab({ caseId, apiMatter, toast }) {
 
   useEffect(() => {
     fetchCommunications();
-  }, [fetchCommunications]);
+  }, [fetchCommunications, matterRefreshTick]);
 
   const handleOpenCreate = () => {
     setEditingComm(null);
@@ -5134,7 +5134,13 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
     clientName: '',
     status: 'Draft',
     notes: '',
+    deliveryMethod: 'email',
+    deliveryEmail: '',
+    recipientName: '',
+    recipientAddress: '',
+    recipientType: 'client',
   });
+  const [companyProfile, setCompanyProfile] = useState(null);
   const [globalTemplates, setGlobalTemplates] = useState([]);
   const [creationType, setCreationType] = useState('blank');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -5144,6 +5150,12 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
       api.templates.list({ limit: 100 }).then(res => {
         setGlobalTemplates(res.data || []);
       }).catch(err => console.error('Failed to load templates for selector', err));
+
+      if (!companyProfile) {
+        api.settings.getCompanyProfile().then(res => {
+          setCompanyProfile(res.data || res || null);
+        }).catch(err => console.error('Failed to load company profile for draft letterhead', err));
+      }
     }
   }, [isCreateDraftOpen]);
 
@@ -5243,15 +5255,38 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
     }
   };
   const openCreateDraftModal = (cat = '') => {
+    const isLetterMode = cat === 'letter' || cat === 'Demand Letter';
+    const clientObj = apiMatter?.client;
+    const formattedAddr = clientObj ? [
+      clientObj.address_line_1 || clientObj.home_address || clientObj.business_address,
+      clientObj.address_line_2,
+      [clientObj.city, clientObj.state, clientObj.postal_code].filter(Boolean).join(', '),
+      clientObj.country
+    ].filter(Boolean).join('\n') : '';
+
+    const initialDeliveryMethod = clientObj?.email ? 'email' : 'us_mail';
+    const initialDeliveryEmail = clientObj?.email || '';
+    const initialRecipientName = clientObj?.full_name || currentCase.client || '';
+
+    let defaultNotes = '';
+    if (isLetterMode) {
+      defaultNotes = `Dear ${initialRecipientName || 'Client'},\n\nWe are writing to provide you with a formal update regarding ${currentCase.title || 'your matter'} (Matter #${apiMatter?.matter_number || currentCase.id || ''}).\n\n[Please enter the details of your correspondence here...]\n\nShould you have any questions or require additional documentation, please contact our office directly at {{FirmPhone}} or via email at {{FirmEmail}}.\n\nThank you for your cooperation.\n\nSincerely,\n${apiMatter?.assigned_lawyer?.full_name || 'Victoria Tulsidas, Esq.'}`;
+    }
+
     setCreationType('blank');
     setSelectedTemplateId('');
     setNewDraftForm({
-      title: '',
+      title: isLetterMode ? `Formal Correspondence - ${currentCase.title || 'Client Matter'}` : '',
       category: typeof cat === 'string' ? cat : '',
       matterName: currentCase.title || '',
       clientName: currentCase.client || '',
       status: 'Draft',
-      notes: '',
+      notes: defaultNotes,
+      deliveryMethod: initialDeliveryMethod,
+      deliveryEmail: initialDeliveryEmail,
+      recipientName: initialRecipientName,
+      recipientAddress: formattedAddr,
+      recipientType: 'client',
     });
     setIsCreateDraftOpen(true);
   };
@@ -5290,11 +5325,26 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         toast('Missing user session.', 'error');
         return;
       }
+
+      let finalContent = newDraftForm.notes.trim();
+      const isLetter = (newDraftForm.category || '').toLowerCase() === 'letter' || (newDraftForm.category || '').toLowerCase().includes('letter') || (newDraftForm.category || '').toLowerCase() === 'demand letter';
+
+      if (isLetter) {
+        const meta = {
+          delivery_method: newDraftForm.deliveryMethod || 'email',
+          delivery_email: newDraftForm.deliveryEmail || '',
+          recipient_name: newDraftForm.recipientName || '',
+          recipient_address: newDraftForm.recipientAddress || '',
+        };
+        const stripped = finalContent.replace(/<!--\s*LETTER_META:[\s\S]*?-->\s*/gi, '').trim();
+        finalContent = `<!--LETTER_META:${JSON.stringify(meta)}-->\n${stripped}`;
+      }
+
       await api.drafts.create({
         matter_id: Number(caseId),
         title: newDraftForm.title.trim(),
         category: newDraftForm.category.trim(),
-        content: newDraftForm.notes.trim() || null,
+        content: finalContent || null,
         created_by_user_id: u.id,
         status: 'draft',
       });
@@ -5815,7 +5865,7 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
           )}
 
           {(tab === 'Communication' || tab === 'Communications') && (
-            <MatterCommunicationsTab caseId={caseId} apiMatter={apiMatter} toast={toast} />
+            <MatterCommunicationsTab caseId={caseId} apiMatter={apiMatter} toast={toast} matterRefreshTick={matterRefreshTick} />
           )}
 
           {isClient && (
@@ -7325,104 +7375,332 @@ export function CaseDetailPage({ caseId, navigate, toast, openModal, role: origi
         </Modal>
       )}
 
-      {isCreateDraftOpen && (
-        <Modal
-          title="Create New Draft"
-          onClose={() => setIsCreateDraftOpen(false)}
-          footer={
-            <>
-              <button onClick={() => setIsCreateDraftOpen(false)} className="btn btn-secondary btn-sm">Cancel</button>
-              <button onClick={saveNewDraft} className="btn btn-primary btn-sm">Save Draft</button>
-            </>
-          }
-        >
-          <div className="space-y-4">
-            <Field label="Draft Creation Mode" required>
-              <Select
-                value={creationType}
-                onChange={(e) => {
-                  setCreationType(e.target.value);
-                  if (e.target.value === 'blank') {
-                    setSelectedTemplateId('');
-                  }
-                }}
-              >
-                <option value="blank">Create Blank Draft</option>
-                <option value="template">Create From Template</option>
-              </Select>
-            </Field>
+      {isCreateDraftOpen && (() => {
+        const isLetterMode = (newDraftForm.category || '').toLowerCase() === 'letter' || (newDraftForm.category || '').toLowerCase() === 'demand letter' || (newDraftForm.category || '').toLowerCase().includes('letter');
 
-            {creationType === 'template' && (
-              <Field label="Select Template" required>
-                <Select
-                  value={selectedTemplateId}
-                  onChange={(e) => handleTemplateChange(e.target.value)}
-                >
-                  <option value="">Select a template...</option>
-                  {globalTemplates.map(t => (
-                    <option key={t.id} value={t.id}>{t.title} ({t.category || 'General'})</option>
-                  ))}
-                </Select>
-              </Field>
-            )}
+        return (
+          <Modal
+            title={isLetterMode ? "Formal Letter & Legal Correspondence Builder" : "Create New Draft"}
+            wide={isLetterMode || creationType === 'template'}
+            onClose={() => setIsCreateDraftOpen(false)}
+            footer={
+              <>
+                <button onClick={() => setIsCreateDraftOpen(false)} className="btn btn-secondary btn-sm">Cancel</button>
+                <button onClick={saveNewDraft} className="btn btn-primary btn-sm">
+                  {isLetterMode ? 'Save & Finalize Letter' : 'Save Draft'}
+                </button>
+              </>
+            }
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Draft Creation Mode" required>
+                  <Select
+                    value={creationType}
+                    onChange={(e) => {
+                      setCreationType(e.target.value);
+                      if (e.target.value === 'blank') {
+                        setSelectedTemplateId('');
+                      }
+                    }}
+                  >
+                    <option value="blank">Create Blank Document</option>
+                    <option value="template">Load From Template Library</option>
+                  </Select>
+                </Field>
 
-            <Field label="Draft Title" required>
-              <Input
-                value={newDraftForm.title}
-                onChange={(e) => setNewDraftForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter draft title"
-              />
-            </Field>
-            <Field label="Category / Template Type" required>
-              <Select
-                value={newDraftForm.category}
-                onChange={(e) => setNewDraftForm((prev) => ({ ...prev, category: e.target.value }))}
-              >
-                <option value="">Select category</option>
-                <option value="Agreement">Agreement</option>
-                <option value="letter">Letter</option>
-                <option value="court_form">Court Form</option>
-                <option value="Contract">Contract</option>
-                <option value="Motion">Motion</option>
-                <option value="Pleading">Pleading</option>
-                <option value="Affidavit">Affidavit</option>
-                <option value="Notice">Notice</option>
-                <option value="Demand Letter">Demand Letter</option>
-                <option value="Legal Disclaimer">Legal Disclaimer</option>
-                <option value="Engagement">Engagement</option>
-                <option value="Intake">Intake</option>
-                <option value="Litigation">Litigation</option>
-                <option value="Resolution">Resolution</option>
-                <option value="General">General</option>
-                <option value="Other">Other...</option>
-              </Select>
-            </Field>
-            <Field label="Related Matter Name">
-              <Input
-                value={newDraftForm.matterName}
-                onChange={(e) => setNewDraftForm((prev) => ({ ...prev, matterName: e.target.value }))}
-              />
-            </Field>
-            <Field label="Client Name">
-              <Input
-                value={newDraftForm.clientName}
-                onChange={(e) => setNewDraftForm((prev) => ({ ...prev, clientName: e.target.value }))}
-              />
-            </Field>
-            <Field label="Draft Status">
-              <Input value={newDraftForm.status} disabled />
-            </Field>
-            <Field label="Mock Content / Notes">
-              <Textarea
-                rows={4}
-                value={newDraftForm.notes}
-                onChange={(e) => setNewDraftForm((prev) => ({ ...prev, notes: e.target.value }))}
-                placeholder="Add mock legal draft notes..."
-              />
-            </Field>
-          </div>
-        </Modal>
-      )}
+                <Field label="Category / Template Type" required>
+                  <Select
+                    value={newDraftForm.category}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      const isNowLetter = newCat.toLowerCase() === 'letter' || newCat.toLowerCase() === 'demand letter' || newCat.toLowerCase().includes('letter');
+                      setNewDraftForm((prev) => {
+                        const clientObj = apiMatter?.client;
+                        const formattedAddr = clientObj ? [
+                          clientObj.address_line_1 || clientObj.home_address || clientObj.business_address,
+                          clientObj.address_line_2,
+                          [clientObj.city, clientObj.state, clientObj.postal_code].filter(Boolean).join(', '),
+                          clientObj.country
+                        ].filter(Boolean).join('\n') : '';
+
+                        return {
+                          ...prev,
+                          category: newCat,
+                          ...(!prev.title && isNowLetter ? { title: `Formal Correspondence - ${currentCase.title || 'Client Matter'}` } : {}),
+                          ...(!prev.notes && isNowLetter ? {
+                            notes: `Dear ${clientObj?.full_name || 'Client'},\n\nWe are writing to provide you with a formal update regarding ${currentCase.title || 'your matter'} (Matter #${apiMatter?.matter_number || currentCase.id || ''}).\n\n[Please enter the details of your correspondence here...]\n\nShould you have any questions or require additional documentation, please contact our office directly at {{FirmPhone}} or via email at {{FirmEmail}}.\n\nThank you for your cooperation.\n\nSincerely,\n${apiMatter?.assigned_lawyer?.full_name || 'Victoria Tulsidas, Esq.'}`
+                          } : {}),
+                          ...(isNowLetter && !prev.recipientAddress ? {
+                            recipientAddress: formattedAddr,
+                            recipientName: clientObj?.full_name || currentCase.client || '',
+                            deliveryEmail: clientObj?.email || '',
+                          } : {})
+                        };
+                      });
+                    }}
+                  >
+                    <option value="">Select category</option>
+                    <option value="letter">Letter (Formal Correspondence)</option>
+                    <option value="Demand Letter">Demand Letter</option>
+                    <option value="Notice">Notice</option>
+                    <option value="Agreement">Agreement</option>
+                    <option value="court_form">Court Form</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Motion">Motion</option>
+                    <option value="Pleading">Pleading</option>
+                    <option value="Affidavit">Affidavit</option>
+                    <option value="Engagement">Engagement</option>
+                    <option value="Intake">Intake</option>
+                    <option value="Litigation">Litigation</option>
+                    <option value="Resolution">Resolution</option>
+                    <option value="General">General</option>
+                    <option value="Other">Other...</option>
+                  </Select>
+                </Field>
+              </div>
+
+              {creationType === 'template' && (
+                <Field label="Select Template" required>
+                  <Select
+                    value={selectedTemplateId}
+                    onChange={(e) => handleTemplateChange(e.target.value)}
+                  >
+                    <option value="">Select a template...</option>
+                    {globalTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.title} ({t.category || 'General'})</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
+              {/* ─── LETTERHEAD AUTO-POPULATION BANNER (LETTER MODE) ─── */}
+              {isLetterMode && (
+                <div className="p-4 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.01] flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    {companyProfile?.logo_url ? (
+                      <img
+                        src={`${API_BASE_URL.replace(/\/api\/?$/, '')}${companyProfile.logo_url}`}
+                        alt="Firm Logo"
+                        className="w-12 h-12 object-contain rounded-xl bg-white/10 p-1 border border-white/10 shadow-md"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-[#0057c7]/20 border border-[#0057c7]/40 flex items-center justify-center text-xl text-[#38bdf8]">
+                        ⚖️
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-[14px] font-800 text-white tracking-tight">
+                          {companyProfile?.company_name || 'Victoria Tulsidas Law, APC'}
+                        </h4>
+                        <span className="text-[9px] font-900 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                          ✓ Firm Logo & Letterhead Auto-Populated
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#8a94a6] mt-0.5">
+                        {companyProfile?.address ? companyProfile.address.replace(/\n/g, ', ') : '750 San Vicente Blvd, Suite 800, West Hollywood, CA 90069'} · {companyProfile?.phone ? companyProfile.phone : '(310) 504-2359'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] text-[#8a94a6]">
+                    <span className="font-700 text-white">Date:</span> {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── AREA ON TOP: TRANSMISSION / DELIVERY METHOD INDICATOR (REQUIREMENT 2) ─── */}
+              {isLetterMode && (
+                <div className="p-4 rounded-2xl border border-[#0057c7]/30 bg-[#0057c7]/[0.05] space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-[12px] font-800 text-[#38bdf8] uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📬</span> Transmission / Delivery Method (Top Indicator)
+                    </label>
+                    <span className="text-[10px] font-800 px-2.5 py-1 rounded-lg bg-black/60 text-amber-300 border border-amber-400/20 uppercase tracking-wider font-mono shadow-sm">
+                      {newDraftForm.deliveryMethod === 'email' ? `VIA EMAIL: ${newDraftForm.deliveryEmail || 'RECIPIENT EMAIL'}` :
+                       newDraftForm.deliveryMethod === 'certified_mail' ? 'VIA CERTIFIED MAIL, RETURN RECEIPT REQUESTED' :
+                       newDraftForm.deliveryMethod === 'courier' ? 'VIA OVERNIGHT COURIER' : 'VIA U.S. FIRST CLASS MAIL'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'email', label: 'Via Email', icon: '✉️', desc: 'Electronic Delivery' },
+                      { id: 'us_mail', label: 'Via U.S. Mail', icon: '📬', desc: 'First Class Mail' },
+                      { id: 'certified_mail', label: 'Certified Mail', icon: '📮', desc: 'Return Receipt Req.' },
+                      { id: 'courier', label: 'Overnight / Courier', icon: '📦', desc: 'FedEx / Express' }
+                    ].map(m => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setNewDraftForm(prev => ({ ...prev, deliveryMethod: m.id }))}
+                        className={`p-2.5 rounded-xl border text-left transition-all flex flex-col gap-0.5 cursor-pointer ${
+                          newDraftForm.deliveryMethod === m.id
+                            ? 'bg-[#0057c7] border-[#38bdf8] text-white shadow-lg shadow-[#0057c7]/30'
+                            : 'bg-white/[0.03] border-white/5 text-[#8a94a6] hover:bg-white/[0.06] hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 text-[12px] font-800">
+                          <span>{m.icon}</span>
+                          <span>{m.label}</span>
+                        </div>
+                        <span className="text-[10px] opacity-75">{m.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {newDraftForm.deliveryMethod === 'email' && (
+                    <div className="pt-1">
+                      <Field label="Transmission Email Address" required>
+                        <Input
+                          type="email"
+                          value={newDraftForm.deliveryEmail}
+                          onChange={e => setNewDraftForm(prev => ({ ...prev, deliveryEmail: e.target.value }))}
+                          placeholder="client@example.com"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─── RECIPIENT DESTINATION ("TO:" BLOCK - WHERE WE'RE SENDING IT) ─── */}
+              {isLetterMode && (
+                <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-[12px] font-800 text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📍</span> Recipient Destination Address ("TO:" Block)
+                    </label>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const c = apiMatter?.client;
+                          const addr = c ? [
+                            c.address_line_1 || c.home_address || c.business_address,
+                            c.address_line_2,
+                            [c.city, c.state, c.postal_code].filter(Boolean).join(', '),
+                            c.country
+                          ].filter(Boolean).join('\n') : '';
+                          setNewDraftForm(prev => ({
+                            ...prev,
+                            recipientName: c?.full_name || currentCase.client || '',
+                            recipientAddress: addr,
+                            deliveryEmail: c?.email || prev.deliveryEmail,
+                            recipientType: 'client'
+                          }));
+                          toast('Auto-populated recipient address from client record!', 'info');
+                        }}
+                        className="btn btn-secondary h-6 px-2.5 text-[10px] font-800 uppercase tracking-wider"
+                      >
+                        👤 Re-fill Client
+                      </button>
+                      {apiMatter?.opposing_party && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewDraftForm(prev => ({
+                              ...prev,
+                              recipientName: apiMatter.opposing_party || '',
+                              recipientAddress: apiMatter.court_address || '',
+                              recipientType: 'opposing'
+                            }));
+                            toast('Populated from opposing party details.', 'info');
+                          }}
+                          className="btn btn-secondary h-6 px-2.5 text-[10px] font-800 uppercase tracking-wider"
+                        >
+                          ⚖️ Opposing Party
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Field label="Recipient Full Name / Organization" required>
+                      <Input
+                        value={newDraftForm.recipientName}
+                        onChange={e => setNewDraftForm(prev => ({ ...prev, recipientName: e.target.value }))}
+                        placeholder="e.g. John Doe, Esq."
+                      />
+                    </Field>
+                    <div className="md:col-span-2">
+                      <Field label="Recipient Street Address (Line 1, 2, City, State, ZIP)" required>
+                        <Textarea
+                          rows={2}
+                          value={newDraftForm.recipientAddress}
+                          onChange={e => setNewDraftForm(prev => ({ ...prev, recipientAddress: e.target.value }))}
+                          placeholder="123 Ocean Blvd, Suite 400&#10;Santa Monica, CA 90401"
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── DRAFT TITLE & DETAILS ─── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label={isLetterMode ? "Letter Subject / Title" : "Draft Title"} required>
+                  <Input
+                    value={newDraftForm.title}
+                    onChange={(e) => setNewDraftForm((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder={isLetterMode ? "e.g. Formal Client Representation Letter" : "Enter draft title"}
+                  />
+                </Field>
+                <Field label="Related Case / Matter">
+                  <Input
+                    value={newDraftForm.matterName}
+                    disabled
+                  />
+                </Field>
+              </div>
+
+              {!isLetterMode && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field label="Client Name">
+                    <Input
+                      value={newDraftForm.clientName}
+                      disabled
+                    />
+                  </Field>
+                  <Field label="Draft Status">
+                    <Input value={newDraftForm.status} disabled />
+                  </Field>
+                </div>
+              )}
+
+              {/* ─── CONTENT / BODY EDITOR ─── */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                  <label className="text-[12px] font-800 text-white uppercase tracking-wider">
+                    {isLetterMode ? "Letter Correspondence Body" : "Draft Content / Notes"}
+                  </label>
+                  {isLetterMode && (
+                    <div className="flex items-center gap-1 text-[10px] text-[#8a94a6] flex-wrap">
+                      <span className="font-700">Quick Tokens:</span>
+                      {['{{RecipientName}}', '{{DeliveryMethod}}', '{{TodayDate}}', '{{MatterTitle}}', '{{FirmPhone}}'].map(tok => (
+                        <button
+                          key={tok}
+                          type="button"
+                          onClick={() => setNewDraftForm(prev => ({ ...prev, notes: (prev.notes || '') + ' ' + tok }))}
+                          className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[#38bdf8] font-mono text-[9px] border border-white/5 cursor-pointer"
+                        >
+                          {tok}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Textarea
+                  rows={isLetterMode ? 8 : 4}
+                  value={newDraftForm.notes}
+                  onChange={(e) => setNewDraftForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder={isLetterMode ? "Write your letter content here..." : "Add mock legal draft notes..."}
+                />
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {isAddPartyModalOpen && createPortal(
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in" onClick={() => setIsAddPartyModalOpen(false)}>
@@ -10639,21 +10917,350 @@ export function EmailPage({ toast, openModal, role = 'lawyer' }) {
 // ─────────────────────────────────────────────────────────
 //  AI ASSISTANT PAGE
 // ─────────────────────────────────────────────────────────
-export function AIPage({ toast }) {
+export function AIPage({ toast, user }) {
+  const [messages, setMessages] = useState([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: `Hello! I am your **VyNius Legal AI Specialist**, equipped with LexisNexis-caliber statutory research and Claude-level analytical drafting.\n\nHow can I assist you with your case research, workflow analysis, or litigation drafting today? You can select any active case file above to ground our research on documented facts, injuries, and pleadings.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [matters, setMatters] = useState([]);
+  const [selectedMatterId, setSelectedMatterId] = useState('');
+  const [workflowMode, setWorkflowMode] = useState('general');
+  const [copiedId, setCopiedId] = useState(null);
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const fetchMatters = async () => {
+      try {
+        const res = await api.matters.list({ limit: 100 });
+        if (res && res.data) {
+          setMatters(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch (err) {
+        console.warn('Could not load matters for VyNius Workspace:', err);
+      }
+    };
+    fetchMatters();
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
+
+  const currentMatter = matters.find(m => String(m.id) === String(selectedMatterId));
+
+  const quickPrompts = currentMatter ? [
+    { label: '⚖️ Analyze Case Strengths', text: 'Analyze the liability, causation, and key legal strengths of this case under California law.' },
+    { label: '⏳ Check SOL & Deadlines', text: 'What is the applicable Statute of Limitations (SOL) and key procedural deadlines for this matter?' },
+    { label: '✍️ Draft Deposition Outline', text: 'Draft a comprehensive deposition outline and key examination questions for the opposing party in this matter.' },
+    { label: '📋 Summarize Plaintiff Injuries', text: "Summarize the plaintiff's documented injuries, medical care, and general damages from the case file." },
+    { label: '📑 Demand Letter Arguments', text: 'Draft strong legal arguments for a formal demand letter highlighting liability and compensatory damages.' },
+  ] : [
+    { label: '🔍 California Tort Law Research', text: 'Provide a breakdown of the required elements and standard of care for a California premises liability claim.' },
+    { label: '⏳ CA CCP § 335.1 Statute of Limitations', text: 'Explain the statute of limitations under California CCP § 335.1 and recognized tolling exceptions.' },
+    { label: '✍️ Draft Form Interrogatories', text: 'Draft 5 critical special interrogatories for an injury claim regarding liability and insurance coverage.' },
+    { label: '📄 IRAC Legal Analysis', text: 'Explain the IRAC methodology and how to structure a winning summary judgment opposition brief.' },
+  ];
+
+  const handleSend = async (textToSend) => {
+    const promptText = (textToSend || inputValue).trim();
+    if (!promptText || isLoading) return;
+
+    const userMessageId = `user_${Date.now()}`;
+    const userMsg = {
+      id: userMessageId,
+      role: 'user',
+      content: promptText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const newHistory = [...messages, userMsg];
+    setMessages(newHistory);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const payloadMessages = newHistory
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({ role: m.role, content: m.content }));
+
+      const res = await api.ai.chat({
+        messages: payloadMessages.length > 0 ? payloadMessages : [{ role: 'user', content: promptText }],
+        matterId: selectedMatterId ? parseInt(selectedMatterId, 10) : null,
+        workflowMode
+      });
+
+      const replyContent = res?.data?.reply || res?.reply || 'I am ready to assist with your next inquiry.';
+      const assistantMsg = {
+        id: `ai_${Date.now()}`,
+        role: 'assistant',
+        content: replyContent,
+        model: res?.data?.model || 'gpt-4o',
+        hasMatterContext: res?.data?.hasMatterContext,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (err) {
+      const errorMsg = {
+        id: `err_${Date.now()}`,
+        role: 'assistant',
+        isError: true,
+        content: `⚠️ **AI Service Notice:** ${err.message || 'Unable to connect to OpenAI service. Please verify your connection or API key.'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const clearChat = () => {
+    setMessages([
+      {
+        id: 'welcome_reset',
+        role: 'assistant',
+        content: `Chat session reset. Focused matter: **${currentMatter ? `${currentMatter.matter_number} — ${currentMatter.title}` : 'Firm-Wide General Practice'}**.\n\nHow can I assist you with legal research, drafting, or statutory analysis?`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  };
+
   return (
     <div className="animate-fade-in space-y-4">
-      <PageHeader title="VyNius Assistant" subtitle="Powered by ">
-        <span className="flex items-center gap-1.5 text-[12px] text-emerald-600 font-500">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />Online
-        </span>
+      {/* Header */}
+      <PageHeader 
+        title="VyNius Assistant" 
+        subtitle="Senior Legal Research Specialist · LexisNexis & Claude Analytical Standards"
+      >
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            GPT-4o Connected
+          </span>
+          <button
+            onClick={clearChat}
+            className="px-3 py-1 text-xs rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors border border-white/10 flex items-center gap-1.5"
+          >
+            <span>↺</span> Reset Session
+          </button>
+        </div>
       </PageHeader>
 
-      <Card className="min-h-[520px] flex items-center justify-center">
-        <EmptyState icon="🤖" title="AI assistant unavailable" desc="Live AI service is not configured yet." />
-      </Card>
+      {/* Main Container Card */}
+      <div className="bg-[#0e1626] border border-white/10 rounded-2xl shadow-2xl flex flex-col h-[calc(100vh-210px)] min-h-[580px] overflow-hidden">
+        
+        {/* Top Control Bar: Case Selector & Workflow Mode */}
+        <div className="px-5 py-3 bg-[#0a101d] border-b border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
+            <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              📁 Focused Case File:
+            </span>
+            <select
+              value={selectedMatterId}
+              onChange={(e) => setSelectedMatterId(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#0057c7] max-w-md w-full font-medium"
+            >
+              <option value="" className="bg-[#0e1626] text-slate-300">Firm-Wide (General Jurisprudence)</option>
+              {matters.map(m => (
+                <option key={m.id} value={m.id} className="bg-[#0e1626] text-white">
+                  {m.matter_number} — {m.title} {m.client?.full_name ? `(${m.client.full_name})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 shrink-0">
+            {[
+              { id: 'general', label: 'General' },
+              { id: 'discovery_drafter', label: 'Discovery' },
+              { id: 'sol_checker', label: 'SOL / Deadlines' },
+              { id: 'document_summary', label: 'Synthesis' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setWorkflowMode(tab.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  workflowMode === tab.id
+                    ? 'bg-[#0057c7] text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Active Grounding Banner if matter selected */}
+        {currentMatter && (
+          <div className="px-5 py-2 bg-gradient-to-r from-[#0057c7]/20 via-[#0057c7]/10 to-transparent border-b border-white/5 flex items-center justify-between text-xs text-sky-200 shrink-0">
+            <span className="flex items-center gap-2 truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <strong>Active Case:</strong> {currentMatter.matter_number} · {currentMatter.title}
+              {currentMatter.client?.full_name && ` (${currentMatter.client.full_name})`}
+            </span>
+            <span className="text-[10px] uppercase font-bold text-sky-400 tracking-wider shrink-0 ml-3">
+              Dossier &amp; Pleadings Grounded
+            </span>
+          </div>
+        )}
+
+        {/* Chat Feed */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 bg-[#0a0f1d] custom-scrollbar">
+          {messages.map((msg) => {
+            const isUser = msg.role === 'user';
+            return (
+              <div
+                key={msg.id}
+                className={`flex gap-3.5 ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
+              >
+                {!isUser && (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0057c7] to-[#38bdf8] flex items-center justify-center text-white text-base shadow-lg shadow-[#0057c7]/30 shrink-0 mt-0.5">
+                    ⚖️
+                  </div>
+                )}
+
+                <div
+                  className={`max-w-[85%] rounded-2xl p-4 sm:p-5 text-[13.5px] leading-relaxed relative ${
+                    isUser
+                      ? 'bg-[#0057c7] text-white shadow-lg shadow-[#0057c7]/20 rounded-br-sm font-medium'
+                      : msg.isError
+                        ? 'bg-red-500/10 border border-red-500/20 text-red-200 rounded-bl-sm'
+                        : 'bg-white/[0.03] border border-white/10 text-slate-200 shadow-xl rounded-bl-sm backdrop-blur-md'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-4 mb-2 pb-1.5 border-b border-white/10 text-[10px] text-slate-400">
+                    <span className="font-bold uppercase tracking-wider text-slate-300">
+                      {isUser ? 'You (Counsel)' : 'VyNius Legal Specialist (GPT-4o)'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>{msg.timestamp}</span>
+                      {!isUser && (
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(msg.content, msg.id)}
+                          className="hover:text-white transition-colors text-[10px] font-semibold bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded border border-white/10 flex items-center gap-1"
+                        >
+                          {copiedId === msg.id ? '✓ Copied' : 'Copy'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="prose prose-invert max-w-none text-[13.5px] leading-relaxed whitespace-pre-wrap break-words font-sans">
+                    {msg.content}
+                  </div>
+                </div>
+
+                {isUser && (
+                  <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5">
+                    ME
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {isLoading && (
+            <div className="flex gap-3 justify-start animate-fade-in">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0057c7] to-[#38bdf8] flex items-center justify-center text-white text-base shadow-md shrink-0">
+                ⚖️
+              </div>
+              <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-4 rounded-bl-sm text-slate-300 flex items-center gap-3">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-xs text-sky-300 font-medium">
+                  VyNius is synthesizing legal authorities &amp; case facts...
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Quick Suggestion Chips */}
+        <div className="px-5 py-2.5 border-t border-white/5 bg-[#0a101d] flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+            Suggested Prompts:
+          </span>
+          {quickPrompts.map((chip, idx) => (
+            <button
+              key={idx}
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleSend(chip.text)}
+              className="text-xs whitespace-nowrap px-3.5 py-1 rounded-xl bg-white/[0.04] hover:bg-[#0057c7]/20 hover:border-[#0057c7]/50 hover:text-sky-300 border border-white/10 text-slate-300 font-medium transition-all shrink-0 active:scale-95 disabled:opacity-50"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Bottom Input Composer */}
+        <div className="p-4 sm:p-5 border-t border-white/10 bg-[#070e1c] shrink-0">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 focus-within:border-[#0057c7] transition-all shadow-inner"
+          >
+            <textarea
+              ref={inputRef}
+              rows={2}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder={
+                currentMatter
+                  ? `Ask legal research, discovery, or SOL questions for ${currentMatter.matter_number}...`
+                  : "Ask any legal question, statutory analysis, or litigation workflow strategy..."
+              }
+              className="flex-1 bg-transparent border-none outline-none px-3 py-1.5 text-sm text-white placeholder:text-slate-500 resize-none font-sans"
+            />
+            <button
+              type="submit"
+              disabled={!inputValue.trim() || isLoading}
+              className="h-11 px-5 rounded-xl bg-[#0057c7] hover:bg-[#004bb1] text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-[#0057c7]/30 shrink-0"
+            >
+              <span>Send</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </button>
+          </form>
+          <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2.5 px-1">
+            <span>Press <kbd className="font-mono bg-white/10 px-1.5 py-0.5 rounded text-slate-300">Enter</kbd> to send, <kbd className="font-mono bg-white/10 px-1.5 py-0.5 rounded text-slate-300">Shift+Enter</kbd> for new line</span>
+            <span>Grounding: LexisNexis Precedents · California &amp; Federal Law</span>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────────────────
 //  USERS PAGE
